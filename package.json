@@ -50,7 +50,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --exclude 'tests/backend/**'",
+    "test": "vitest run --exclude \"tests/backend/**\"",
     "test:backend": "vitest run tests/backend --maxWorkers=1",
     "backend:start": "node scripts/backend/media-assets.mjs && supabase start -x studio,imgproxy,postgres-meta,realtime,logflare,vector,supavisor",
     "backend:stop": "supabase stop",

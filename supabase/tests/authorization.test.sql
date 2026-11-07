@@ -1,0 +1,16 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set search_path=public,extensions;
+select plan(10);
+select is((select count(*) from pg_tables where schemaname='app_private' and not rowsecurity),0::bigint,'All application tables have RLS enabled');
+select ok(not has_schema_privilege('anon','app_private','USAGE'),'Guests cannot access the private schema');
+select ok(not has_schema_privilege('authenticated','app_private','USAGE'),'Authenticated users cannot access raw application tables');
+select ok(has_function_privilege('anon','public.tinir_read(text,jsonb)','EXECUTE'),'Guests can call the guarded read gateway');
+select ok(not has_function_privilege('anon','public.tinir_write(text,jsonb)','EXECUTE'),'Guests cannot call the write gateway');
+select ok(not has_function_privilege('authenticated','public.tinir_media(text,uuid,jsonb)','EXECUTE'),'Clients cannot call the trusted media gateway');
+select ok(has_function_privilege('service_role','public.tinir_media(text,uuid,jsonb)','EXECUTE'),'Server media gateway has its explicit grant');
+select is((select count(*) from information_schema.columns where table_schema='app_private' and column_name in ('password','password_hash')),0::bigint,'Passwords belong to Supabase Auth, not app profiles');
+select ok((select not public from storage.buckets where id='listing-photos'),'The processed photo bucket is private');
+select is((select count(*) from cron.job where jobname='tinir-semester-reminders'),1::bigint,'Exactly one scheduled reminder job exists');
+select * from finish();
+rollback;

@@ -42,3 +42,11 @@ example
 # generated native folders
 /ios
 /android
+
+# Supabase local state and backup artifacts
+supabase/.temp/
+supabase/.branches/
+backups/
+coverage/
+supabase/functions/media/magick.wasm
+supabase/functions/media/vendor/

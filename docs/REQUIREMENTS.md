@@ -4,9 +4,9 @@
 |---|---|
 | **Product** | Tinir (working title) |
 | **Document** | Functional and Non-Functional Requirements Specification |
-| **Version** | 0.2 (Aligned draft) |
-| **Date** | 2026-11-05 |
-| **Status** | Aligned to supplied ACT 2 validation, backlog, and Activity 4; revised documents not yet re-approved |
+| **Version** | 0.3 (Supabase backend decision) |
+| **Date** | 2026-11-07 |
+| **Status** | Source requirements preserved; selected Expo + Supabase backend and user-approved defaults recorded; screen/hosted acceptance remains separate |
 | **Related** | [PRD](./PRD.md) · [TRD](./TRD.md) |
 
 ## 1. Basis and Interpretation
@@ -67,7 +67,7 @@ Acceptance criteria: The owner inbox groups/filters received inquiries by listin
 
 ### FR12: Students can search accommodation listings by keyword and filter results by price range, room type, and amenities.
 
-Acceptance criteria: The search bar and filters update published results correctly, including combined criteria and empty-result feedback. Proposed hidden-price handling excludes hidden-price listings whenever a price range is applied; private prices are never used to determine public filtering/order.
+Acceptance criteria: The search bar and filters update published results correctly, including combined criteria and empty-result feedback. Selected hidden-price handling excludes hidden-price listings whenever a price range is applied; private prices are never used to determine public filtering/order.
 
 ### FR13: Students can save accommodation listings and view their saved listings later.
 
@@ -75,7 +75,7 @@ Acceptance criteria: A bookmark action saves/unsaves a listing for the current s
 
 ### FR14: Students can calculate distance between a selected accommodation and the campus location.
 
-Acceptance criteria: A property detail view shows an approximate distance to the configured UPV campus reference point. Proposed method: straight-line Haversine distance, explicitly labeled in km. Confirm the campus point and method before acceptance; a map snippet is optional.
+Acceptance criteria: A property detail view shows an approximate distance to the configured UPV campus reference point. Selected method: straight-line Haversine distance, explicitly labeled in km. Configure the confirmed campus point before acceptance; a map snippet is optional.
 
 ## 3. Non-Functional Requirements
 
@@ -89,7 +89,7 @@ Acceptance criteria: Core guest, student, and owner flows work at 360 px and rep
 
 ### NFR3: All communication uses HTTPS.
 
-Acceptance criteria: Deployed app/API endpoints use HTTPS and session cookies are Secure.
+Acceptance criteria: Deployed app/API endpoints use HTTPS. Native sessions use secure device storage; the selected web client uses per-tab session storage. Any future browser-cookie transport must use Secure/HTTP-only settings. Local HTTP is a development-only exception.
 
 ### NFR4: Passwords are stored securely hashed.
 
@@ -159,23 +159,23 @@ Sprint 1 contains Prereq 1–6: sitemap, wireframes, data requirements, ER diagr
 - **Privacy/mobile/data/media risks (risks 6–9):** Enforce NFR1–NFR10, daily backups, secure database configuration, responsive layouts, and image validation/compression.
 - **Expectations (risk 10):** Review activity guides regularly and record design decisions/artifacts for instructor/client review.
 
-## 6. Proposed Implementation Details
+## 6. Implementation Defaults and Remaining Proposals
 
-These retain useful detail from the earlier draft. They are not additional stakeholder-approved requirements and do not change the backlog priorities above. Exact tools and limits need team confirmation.
+These retain useful detail from the earlier draft without changing canonical FR/NFR IDs or backlog priorities. The user selected the Expo + Supabase architecture and the defaults recorded below for backend implementation on 2026-11-07. Other numerical usability/capacity/operational targets remain proposals, not additional stakeholder approvals. See TRD and BACKEND.md for exact implemented interfaces and limitations.
 
 - **Registration:** Full name, email, and password for both roles; contact number required for owners, optional for students; college/program optional for students. Reject invalid/duplicate emails. Proposed password minimum: 8 characters, with a letter and a number.
-- **Verification:** Single-use hashed tokens, proposed 24-hour expiry, rate-limited resend. Unverified users can browse, log out, and complete verification; protected role actions remain blocked. Auth providers may manage tokens/credentials instead of application tables.
-- **Sessions:** HTTP-only, Secure, SameSite=Lax cookies; proposed 7-day expiry. Errors do not reveal whether an email is registered.
+- **Verification:** Supabase-managed single-use confirmation tokens, 24-hour local confirmation expiry, and rate-limited resend. Unconfirmed password login is rejected by Supabase Auth; server role actions separately verify authoritative confirmation state. Unverified users can browse, log out, and complete verification; protected role actions remain blocked. Supabase owns credentials and verification tokens; the app stores a linked private profile.
+- **Sessions:** Native SecureStore persistence supports chunked session records; web uses per-tab sessionStorage with no server-rendered token state. Supabase uses one-hour access tokens, rotating refresh tokens, and a configured seven-day session timebox. Logout clears persisted state; issued JWTs remain bounded by their expiry. Duplicate signup feedback is generic.
 - **Listing fields:** Title, property type (bedspace/room/apartment), address, description, amenities, house rules, photos, availability, coordinates, and last-updated date. Title, type, address, valid coordinates, and availability are required to publish; photo minimum is proposed below. Price period supports monthly/semester.
-- **Prices:** Positive PHP amount when supplied; store integer centavos. Proposed default: price hidden until the owner opts in. Hidden/omitted prices do not block publishing. Visible prices require an amount. Only the owning owner may see private amounts in management views.
-- **Price discovery:** Proposed price-range filters exclude hidden-price listings. Proposed optional price sorting puts hidden-price listings last, ordered by posting date, never by their private amounts. These semantics require team confirmation.
-- **Photos:** Proposed 1–10 images per listing, JPEG/PNG/WebP only, at most 5 MB each. Validate type/content on the server and size on client/server, strip EXIF metadata, compress/resize, and lazy-load responsive images. Cover selection and photo ordering are proposed follow-ups.
+- **Prices:** Positive PHP amount when supplied; store integer centavos. Selected default: price hidden until the owner opts in. Hidden/omitted prices do not block publishing. Visible prices require an amount. Only the owning owner may see private amounts in management views.
+- **Price discovery:** Selected price-range filters exclude hidden-price listings. Proposed optional price sorting puts hidden-price listings last, ordered by posting date, never by their private amounts. The optional sorting proposal remains unimplemented; baseline discovery uses posting date and never private-price ordering.
+- **Photos:** The backend enforces 1–10 photos for published listings, JPEG/PNG/WebP input, at most 5 MiB and 8 million decoded pixels per upload. An Edge Function decodes, strips metadata, resizes and stores WebP; direct client bucket writes are denied. Validate type/content on the server and size on client/server, strip EXIF metadata, compress/resize, and lazy-load responsive images. Cover selection and photo ordering are proposed follow-ups.
 - **Availability/removal:** Available/Full plus optional non-negative slot count. Owners may edit all their listing fields and photos. Confirm removal and archive the listing; archived/draft listings are excluded from all public/student discovery. A save-draft UI is a future option.
 - **Pagination:** Proposed UI default 20 listings; API page size capped at 50. Paginate all lists, including inquiries, saved properties, and reminders.
-- **Inquiries:** Non-empty question text or one-action interest; at most one Pending interest per student/listing. Proposed decision transitions are Pending to Accepted/Rejected, with correction back to Pending. Track read status separately; never imply an accepted inquiry reserves a room.
+- **Inquiries:** Non-empty question text or one-action interest; at most one Pending interest per student/listing. Selected decision transitions are Pending to Accepted/Rejected, with correction back to Pending before changing a decision. Track read status separately; never imply an accepted inquiry reserves a room.
 - **Saved Properties:** Idempotent save/unsave, unique student/listing pair, persistent across sessions. Exclude archived listings and keep each student’s bookmarks private.
-- **Distance:** Proposed straight-line Haversine calculation from confirmed listing coordinates to a configured campus point, in approximate km. No routing/map subscription is assumed. Require coordinates for new publication; show an explicit unavailable reason for legacy records missing them. Confirm method and campus point before acceptance.
-- **Server protection:** Zod or equivalent validation, parameterized ORM queries, plain-text descriptions, escaped output, and rate limits on login, registration, verification/resend, and inquiries. Keep secrets in environment variables, never source control.
+- **Distance:** Selected straight-line Haversine calculation from confirmed listing coordinates to a configured campus point, in approximate km. No routing/map subscription is assumed. Require coordinates for new publication; show an explicit unavailable reason for legacy records missing them. Configure the confirmed campus point before acceptance.
+- **Server protection:** Database constraints and scoped parameterized SQL RPCs, Auth/Edge verification, bounded image processing, Zod client feedback, plain-text descriptions, and configured Auth/mutation rate limits. RLS is enabled and raw private-table access is revoked; privileged RPCs use fixed search paths and explicit identity/ownership checks. Keep secrets in environment variables, never source control.
 - **Disclosure:** Use explicit response fields; exclude owner contacts for guests and hidden prices for all non-owners, including metadata/cached payloads. Invalidate public data when price visibility changes. Protect owner and student record access on every request.
 - **Privacy:** Provide a clear notice and terms during registration; collect minimum personal data. Proposed account deletion is a follow-up with its own data-retention design, not an implemented compliance claim.
 - **Performance/capacity:** Proposed read API p95 ≤ 500 ms, write API p95 ≤ 1 second excluding uploads, at least 500 concurrent users, and capacity for 1,000 listings/10,000 photos. Validate against chosen hosting limits before committing to these targets.
@@ -188,4 +188,8 @@ These retain useful detail from the earlier draft. They are not additional stake
 
 Password reset (single-use email link, proposed 1-hour expiry), sorting, full in-app message threads, email/push inquiry notifications, account deletion, photo ordering, and draft-saving UI are follow-ups outside US1–US14. Full map browsing, PWA installation, reviews/ratings, and additional owner verification are future options. They must not displace scheduled search, saved-listing, or distance stories.
 
-Confirm the client platform/stack, campus point and distance method, private-price filtering/defaults, inquiry correction rules, owner-scoped history, semester dates/scheduler, verification provider, and backup plan before implementation acceptance. The supplied interviews focus on Miagao; broader campus coverage requires confirmation. See PRD §§11–14 and TRD §§5–6, 12–14 for design details and reconciliation decisions.
+The client/backend stack, straight-line method, private-price defaults/filtering, decision correction rules, and provider-managed verification are selected. Configure real campus coordinates, semester dates, and the hosted project/SMTP/HTTPS/backup plan before production acceptance. Dashboard reminders use configured semester dates and an hourly database job; no reference data is fabricated. The supplied interviews focus on Miagao; broader campus coverage requires confirmation. See PRD §§11–14 and TRD §§3–8 for design details and reconciliation decisions.
+
+## 8. Backend Delivery Boundary
+
+The local backend implements services for FR1–FR14, private-schema authorization, email-confirmed roles, validated media handling, and semester reminders. Expo feature screens (apart from the verification callback), browser/native usability, 4G page performance, hosted email delivery, production HTTPS, and active daily backup scheduling require separate evidence. Local backup/restore helpers and a daily timer definition do not prove that a production schedule is installed. Existing issues #4–#7 track domain/schema/architecture/setup; story issues #8–#21 and NFR issues #22–#33 retain their full acceptance criteria. See [Backend setup](BACKEND.md).

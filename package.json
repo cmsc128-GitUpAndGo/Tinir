@@ -4,6 +4,7 @@
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/ui": "~58.0.27",
+    "@supabase/supabase-js": "^2.119.0",
     "expo": "~58.0.23",
     "expo-constants": "~58.0.15",
     "expo-device": "~58.0.5",
@@ -12,6 +13,7 @@
     "expo-image": "~58.0.18",
     "expo-linking": "~58.0.16",
     "expo-router": "~58.0.30",
+    "expo-secure-store": "~58.0.2",
     "expo-splash-screen": "~58.0.13",
     "expo-status-bar": "~58.0.4",
     "expo-symbols": "~58.0.4",
@@ -24,12 +26,21 @@
     "react-native-reanimated": "4.7.1",
     "react-native-safe-area-context": "~5.11.1",
     "react-native-screens": "~4.30.1",
+    "react-native-url-polyfill": "^4.0.0",
     "react-native-web": "~0.21.4",
-    "react-native-worklets": "0.13.0"
+    "react-native-worklets": "0.13.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@imagemagick/magick-wasm": "0.0.46",
+    "@types/node": "^26.6.6",
     "@types/react": "~19.3.0",
-    "typescript": "~6.0.3"
+    "esbuild": "^0.28.2",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "~58.0.4",
+    "supabase": "2.122.1",
+    "typescript": "~6.0.3",
+    "vitest": "^5.1.0"
   },
   "scripts": {
     "start": "expo start",
@@ -37,7 +48,21 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --exclude \"tests/backend/**\"",
+    "test:backend": "vitest run tests/backend --maxWorkers=1",
+    "backend:start": "node scripts/backend/media-assets.mjs && supabase start -x studio,imgproxy,postgres-meta,realtime,logflare,vector,supavisor",
+    "backend:stop": "supabase stop",
+    "backend:reset": "supabase db reset --local",
+    "backend:env": "node scripts/backend/env.mjs",
+    "backend:types": "node scripts/backend/types.mjs",
+    "backend:functions": "node scripts/backend/media-assets.mjs && supabase functions serve media",
+    "backend:backup": "node scripts/backend/backup.mjs dump",
+    "backend:restore-check": "node scripts/backend/backup.mjs verify",
+    "backend:pause-other": "node scripts/backend/containers.mjs pause",
+    "backend:restore-other": "node scripts/backend/containers.mjs restore",
+    "test:db": "supabase test db"
   },
   "private": true
 }

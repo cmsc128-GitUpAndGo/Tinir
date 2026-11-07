@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "@supabase/supabase-js": "./vendor/supabase.js",
+    "@imagemagick/magick-wasm": "./vendor/magick.js"
+  }
+}

@@ -2,364 +2,174 @@
 
 | | |
 |---|---|
-| **Product** | Tinir (working title) |
-| **Document** | Technical Requirements Document |
-| **Version** | 0.2 (Aligned draft) |
-| **Date** | 2026-11-05 |
-| **Status** | Draft. The technology stack is a proposal pending team agreement. |
-| **Related** | [Product Requirements Document (PRD)](./PRD.md) · [Functional and Non-Functional Requirements](./REQUIREMENTS.md) |
+| **Product** | Tinir |
+| **Version** | 0.3 |
+| **Date** | 2026-11-07 |
+| **Status** | Expo + Supabase backend architecture selected by the user; local implementation. Feature screens and hosted deployment remain separate work. |
+| **Related** | [PRD](PRD.md) · [Requirements](REQUIREMENTS.md) · [Backend setup](BACKEND.md) |
 
----
+## 1. Purpose and Delivery Scope
 
-## 1. Purpose and Scope
+Provide backend support for FR1–FR14 and the server-side controls in NFR3–NFR9, preserving the source backlog’s priorities and Sprint 1–5 schedule. Supabase supplies PostgreSQL, Auth, Storage, scheduled database jobs, and Edge Functions; Expo/React Native with Expo Router remains the client. A separate Next.js or Express server is not part of this architecture.
 
-This document turns the product requirements in the [PRD](./PRD.md) into a technical design for the Tinir backlog scope (US1–US14). It covers system architecture, technology stack, data model, API, security, and non-functional requirements. Feature IDs (F1–F7) refer to the PRD.
+This supersedes the earlier draft’s proposed Next.js handlers, ORM, custom password tables, and cookie-only session model. It does not change the product baseline, require a PWA, or claim that backend tests complete UI, usability, browser, native-device, production performance, or operational acceptance.
 
-## 2. System Overview
+## 2. Architecture and Stack
 
-The proposed client is a **mobile-first responsive web application**. Platform and stack selection remain subject to team agreement (backlog Prereq 5). PWA installation is a future option, not a baseline requirement. The backend design below supports the supplied requirements and backlog; it does not establish that these specific technologies have been approved.
-
-```
-┌─────────────────────────┐        HTTPS        ┌──────────────────────────────┐
-│  Client (Web, proposed) │ ──────────────────▶ │  Web App Server (Next.js)    │
-│  - Guest / Student /    │ ◀────────────────── │  - Pages (SSR/SSG)           │
-│    Owner UI             │                     │  - REST API route handlers   │
-└─────────────────────────┘                     │  - Auth middleware / RBAC    │
-                                                └───────┬───────────┬──────────┘
-                                                        │           │
-                                              SQL (ORM) │           │ Signed upload URLs
-                                                        ▼           ▼
-                                           ┌──────────────┐  ┌──────────────────┐
-                                           │  PostgreSQL  │  │  Object Storage  │
-                                           │  (data)      │  │  (listing photos)│
-                                           └──────────────┘  └──────────────────┘
-                                                        │
-                                                        ▼
-                                           ┌─────────────────────────┐
-                                           │ Email service (verify,  │
-                                           │ follow-up reset/notifs) │
-                                           └─────────────────────────┘
+```mermaid
+flowchart LR
+  Expo[Expo / React Native / Expo web] --> Auth[Supabase Auth]
+  Expo --> RPC[Guarded PostgreSQL RPCs]
+  Expo --> Media[Media Edge Function]
+  RPC --> DB[(Private application tables)]
+  Media --> DB
+  Media --> Storage[Private processed-photo bucket]
+  Cron[pg_cron] --> DB
 ```
 
-## 3. Technology Stack (Proposed)
-
-| Layer | Choice | Rationale |
-|---|---|---|
-| Language | TypeScript | One language for frontend and backend; type safety |
-| Frontend / Backend framework | Next.js (App Router) + React | Full-stack in one repo; SSR gives fast first load on mobile |
-| Styling / UI | Tailwind CSS + shadcn/ui | Fast to build, consistent and accessible components |
-| Database | PostgreSQL | Relational data (users, listings, inquiries) |
-| ORM | Prisma or Drizzle | Typed queries and schema migrations |
-| Authentication | Auth.js (NextAuth) credentials provider, or Supabase Auth | Email/password with sessions; supports roles |
-| File storage | Supabase Storage / Cloudinary / S3-compatible | Image upload with signed URLs; free tier available |
-| Email | Resend or similar | Required registration verification (Activity 4); password reset is a proposed follow-up |
-| Validation | Zod | Shared validation schemas for client and server |
-| Hosting | Vercel (app) + managed Postgres (Supabase/Neon) | Free tiers, automatic preview deployments |
-| Testing | Vitest (unit), Playwright (E2E) | |
-| CI | GitHub Actions | Lint, type-check, and test on every pull request |
-
-> **Alternative:** If the team chooses a native mobile app (PRD §11, question 1), use React Native (Expo) for the client. The backend design in this document stays the same.
-
-## 4. Architecture
-
-### 4.1 Application Layers
-
-- **Presentation:** React components and pages, grouped by role (`/` public, `/student/*`, `/owner/*`).
-- **API:** REST route handlers under `/api/*`. They validate input with Zod and check auth and role.
-- **Service:** business logic (for example, an owner may edit only their own listings).
-- **Data access:** ORM models and migrations.
-
-### 4.2 Proposed Repository Structure
-
-```
-tinir/
-├── docs/                 # PRD, TRD, design docs
-├── prisma/               # schema.prisma, migrations, seed
-├── src/
-│   ├── app/              # Next.js routes (pages + api)
-│   │   ├── (public)/     # landing, listings, listing detail, login, signup
-│   │   ├── student/      # inquiries, saved properties
-│   │   ├── owner/        # dashboard, listing create/edit, inquiries
-│   │   └── api/
-│   ├── components/
-│   ├── lib/              # auth, db client, storage, validation schemas
-│   └── services/         # domain logic
-├── tests/
-└── public/
-```
-
-## 5. Data Model
-
-### 5.1 Entity Relationship
-
-```
-User (1) ──< (N) Listing (1) ──< (N) ListingPhoto
- │                  │
- │                  ├──< (N) ListingAmenity >── (N) Amenity
- │                  │
- └──(student) ──< (N) Inquiry >── (1) Listing
-                         │
-                         └──< (N) InquiryMessage   (proposed follow-up)
-```
-
-A student also has many `saved_listings`, each linking to one Listing. A configured `campuses` row supplies the reference point for distance calculations.
-
-### 5.2 Tables
-
-The tables below describe an application-managed credentials design. If Supabase Auth is selected, credentials, sessions, and verification tokens belong to that provider; the application stores a linked user profile and enforces equivalent role/verification rules. Do not duplicate provider-managed password hashes.
-
-#### `users`
-| Column | Type | Constraints / Notes |
-|---|---|---|
-| id | UUID | PK |
-| email | VARCHAR(255) | Unique, not null, stored lowercase |
-| password_hash | VARCHAR | Required for application-managed credentials (bcrypt/argon2); absent from provider-linked profiles |
-| role | ENUM(`student`, `owner`) | Not null |
-| full_name | VARCHAR(120) | Not null |
-| contact_number | VARCHAR(20) | Required for owners |
-| college_program | VARCHAR(120) | Optional, students only |
-| email_verified_at | TIMESTAMPTZ | Null until verified; required for protected role actions |
-| created_at / updated_at | TIMESTAMPTZ | |
-
-#### `listings`
-| Column | Type | Constraints / Notes |
-|---|---|---|
-| id | UUID | PK |
-| owner_id | UUID | FK → users.id, not null |
-| title | VARCHAR(120) | Not null |
-| property_type | ENUM(`bedspace`, `room`, `apartment`) | Not null |
-| description | TEXT | |
-| address | VARCHAR(255) | Not null |
-| barangay / area | VARCHAR(100) | For filtering |
-| latitude / longitude | DECIMAL(9,6) | Required for published listings supporting FR14; valid latitude [-90,90] and longitude [-180,180] |
-| price_amount | INTEGER | In PHP centavos, > 0 when present; nullable when price is hidden |
-| price_visible | BOOLEAN | Proposed default false; true requires a valid price. Hidden amounts are owner-only |
-| price_period | ENUM(`monthly`, `semester`) | Default `monthly` |
-| available_slots | INTEGER | Nullable, ≥ 0 |
-| availability_status | ENUM(`available`, `full`) | Not null |
-| status | ENUM(`draft`, `published`, `archived`) | Default `published` |
-| house_rules | TEXT | Optional (curfew, visitors, etc.) |
-| last_confirmed_at | TIMESTAMPTZ | Set on publication and explicit owner reconfirmation; drives semester reminders |
-| created_at / updated_at | TIMESTAMPTZ | `updated_at` shown as "last updated" |
-
-Indexes: `(status, property_type, price_amount)`, `(owner_id)`.
-
-#### `listing_photos`
-| Column | Type | Notes |
-|---|---|---|
-| id | UUID | PK |
-| listing_id | UUID | FK → listings.id, ON DELETE CASCADE |
-| storage_key | VARCHAR | Object storage path |
-| sort_order | SMALLINT | 0 = cover photo |
-
-#### `amenities` / `listing_amenities`
-- `amenities(id, name, icon)`: seeded list (Wi-Fi, aircon, own CR, kitchen, laundry, parking, study area, water included, electricity included, CCTV, etc.).
-- `listing_amenities(listing_id, amenity_id)`: composite primary key.
-
-#### `inquiries`
-| Column | Type | Notes |
-|---|---|---|
-| id | UUID | PK |
-| listing_id | UUID | FK → listings.id |
-| student_id | UUID | FK → users.id |
-| type | ENUM(`interest`, `question`) | "Express interest" vs. message |
-| message | TEXT | Required when type = `question` |
-| status | ENUM(`pending`, `accepted`, `rejected`) | Default `pending`; owner-controlled decision, not a booking |
-| read_at / status_updated_at | TIMESTAMPTZ | Nullable read timestamp; timestamp of last decision |
-| created_at | TIMESTAMPTZ | |
-
-Constraint: one pending `interest` per `(listing_id, student_id)`, enforced by a partial unique index. Proposed transitions are Pending → Accepted/Rejected and Accepted/Rejected → Pending for corrections. Students cannot set status; every update checks listing ownership. Marking an inquiry read does not change its decision status.
-
-#### `inquiry_messages` (proposed follow-up, outside core backlog)
-`(id, inquiry_id, sender_id, body, created_at)`, used for in-app message threads.
-
-#### `saved_listings` (FR13 / US13)
-`(student_id, listing_id, created_at)`. Composite primary key `(student_id, listing_id)`; foreign keys to users and listings. Students may read/write only their own saved rows. Archived listings are omitted from the Saved Properties response without leaking private listing details.
-
-#### `campuses` (FR14 / US14)
-`(id, name, latitude, longitude)`. The team must confirm the UPV campus reference point before seeding coordinates. Each published listing requires coordinates captured with owner confirmation; no paid geocoding or route provider is assumed.
-
-#### `email_verification_tokens`
-For application-managed auth: `(id, user_id, token_hash, expires_at, consumed_at)`. Store only hashed random tokens; proposed expiry 24 hours, single use. Provider-managed verification replaces this table if selected.
-
-#### Semester reminders
-A configurable semester key and start date drive a scheduled job. Store `(listing_id, semester_key, sent_at)` in `listing_reminders` with a unique `(listing_id, semester_key)` key to avoid duplicate reminders. Owners see dashboard reminders for published listings not confirmed in the current semester. Email delivery is optional; dashboard delivery satisfies the proposed control. Dates must be configured from the team’s academic calendar.
-
-## 6. API Specification
-
-Base path: `/api`. Requests and responses use JSON. P1 endpoints are proposed follow-ups outside US1–US14. Errors use the format `{ "error": { "code": string, "message": string, "fields"?: {...} } }`.
-
-### 6.1 Auth (F2, F3)
-
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| POST | `/auth/register` | Public | Body: `role`, `email`, `password`, `fullName`, role-specific fields. Returns 201 and sends a verification email; no activated role session yet. |
-| POST | `/auth/login` | Public | Sets an HTTP-only session cookie; unverified accounts can only browse, verify, or resend verification |
-| POST | `/auth/verify-email` | Public | Consume a valid single-use verification token; mark verified |
-| POST | `/auth/resend-verification` | Public | Generic response to avoid account disclosure; rate-limited |
-| POST | `/auth/logout` | Authenticated | Ends the session |
-| GET | `/auth/me` | Authenticated | Returns the current user and role |
-| POST | `/auth/forgot-password` | Public (P1) | Sends a reset email |
-| POST | `/auth/reset-password` | Public (P1) | Token + new password |
-
-### 6.2 Listings (F1, F4, F6, F7)
-
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| GET | `/listings` | Public | Published listings only; omit hidden prices and all owner contacts in list responses. Query: `type`, `minPrice`, `maxPrice`, `amenities[]`, `q`, `sort`, `page`, `pageSize` (default 20, max 50) |
-| GET | `/listings/:id` | Public* | Listing detail. *Owner contacts require login; hidden price is omitted for all non-owners. Include approximate campus distance for authenticated students |
-| POST | `/listings` | Owner | Create a listing |
-| PATCH | `/listings/:id` | Owner (own) | Update fields, price visibility, or availability |
-| POST | `/listings/:id/reconfirm` | Owner (own) | Set last-confirmed timestamp and dismiss current semester reminder |
-| GET | `/owner/reminders` | Owner | Paginated semester reminders for own listings |
-| DELETE | `/listings/:id` | Owner (own) | Soft delete (sets `status = archived`) |
-| GET | `/owner/listings` | Owner | The owner's listings in any status |
-| POST | `/listings/:id/photos/upload-url` | Owner (own) | Returns a signed upload URL |
-| POST | `/listings/:id/photos` | Owner (own) | Saves the uploaded photo's metadata |
-| PATCH | `/listings/:id/photos/order` | Owner (own) | Reorders photos / sets the cover |
-| DELETE | `/listings/:id/photos/:photoId` | Owner (own) | Removes a photo |
-| GET | `/amenities` | Public | The amenity list |
-
-### 6.3 Inquiries (F5, F7.5)
-
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| POST | `/listings/:id/inquiries` | Student | Body: `type` (`interest`/`question`), `message?` |
-| GET | `/student/inquiries` | Student | Inquiries the student has sent |
-| GET | `/owner/inquiries` | Owner | Inquiries on the owner's listings. Filter by `listingId`, `status` |
-| PATCH | `/inquiries/:id` | Owner (listing owner) | Set Pending/Accepted/Rejected or mark read independently; enforce defined transitions |
-| GET/POST | `/inquiries/:id/messages` | Participants (proposed follow-up) | Message thread |
-
-### 6.4 Saved Properties (F4.7 / FR13)
-
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| PUT | `/student/saved-listings/:listingId` | Student | Idempotently save a published listing |
-| DELETE | `/student/saved-listings/:listingId` | Student | Idempotently remove own bookmark |
-| GET | `/student/saved-listings` | Student | Paginated Saved Properties, with the same price/contact disclosure rules as listing views |
-
-### 6.5 Campus Distance (F4.8 / FR14)
-
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| GET | `/listings/:id/distance?campusId=...` | Student | Return campus ID, distance in km, and method `straight_line` for a published listing |
-
-Proposed implementation: Haversine calculation using confirmed listing/campus coordinates and Earth radius 6,371 km. Return an approximate straight-line distance rounded for display; do not present it as road distance or travel time. A map provider is unnecessary. Imported legacy data missing coordinates returns `distanceKm: null` with a clear unavailable reason; new publication requires coordinates. The exact method and campus point remain team decisions.
-
-### 6.6 Disclosure and Workflow Rules
-
-- Every protected student/owner endpoint requires a verified account; `/auth/me`, logout, verification, and resend remain available to unverified sessions. Owner contacts require login per NFR8.
-- Use explicit response field lists. Hidden `price_amount` and its derived values must not appear in guest/student detail, list, saved-listing, metadata, or rendered page payloads. The owning owner’s management response may include them.
-- Proposed price filtering: when min/max price is supplied, exclude hidden-price listings. Proposed price sorting places hidden-price listings last, ordered by posting date; their private amounts never determine public order. Visible prices are filterable normally. This reconciles optional pricing with FR12 and requires team confirmation.
-- The owner chooses `price_visible` at creation/edit; a listing with no amount can publish when visibility is false. A visible price requires a positive amount. Switching to hidden takes effect on every response and invalidates cached public data.
-- Owner inquiry history is restricted to inquiries on the requesting owner’s listings. No endpoint exposes a student’s activity with other owners.
-- Dashboard inbox entries provide basic inquiry feedback; real-time chat and email/push notifications are follow-ups. Pending/Accepted/Rejected badges refresh on reload or refetch after an update; no real-time transport is assumed.
-
-## 7. Security Requirements
-
-| ID | Requirement |
+| Component | Selection |
 |---|---|
-| S1 | All traffic over HTTPS. |
-| S2 | Hash passwords with bcrypt (cost ≥ 10) or argon2id. Never log or return them. |
-| S3 | Sessions use HTTP-only, Secure, SameSite=Lax cookies. Session expiry: 7 days. |
-| S4 | Check role-based access control (RBAC) on the server for every protected endpoint. Hiding UI elements is not enough. |
-| S5 | Ownership checks: owners can modify only their own listings and photos. Students can see only their own inquiries. |
-| S6 | Validate all input on the server with Zod. Use parameterized queries through the ORM to prevent SQL injection. |
-| S7 | Escape output by default (React) to prevent XSS. Store user-entered descriptions as plain text. |
-| S8 | Uploads: only JPEG/PNG/WebP, max 5 MB per image. Check MIME type and magic bytes. Strip EXIF metadata (it can contain GPS location). |
-| S9 | Rate-limit login, registration, verification/resend, and inquiry endpoints (for example, 10 requests/min per IP for auth). |
-| S10 | Owner contacts require login. Hidden prices are omitted for everyone except the owning owner in management screens; enforce disclosure on the server. |
-| S11 | Store secrets in environment variables, never in the repository. |
-| S12 | Data privacy: comply with RA 10173. Collect only the minimum data needed, and plan an account-deletion flow as a follow-up; do not represent this proposed endpoint as implemented. |
+| Client | Existing Expo SDK 58, TypeScript, React Native, Expo Router |
+| Database / migrations | Supabase PostgreSQL 17; versioned SQL migrations and generated public RPC types |
+| Application transport | `supabase-js` calling guarded RPCs; no direct client access to base tables |
+| Identity | Supabase Auth email/password with required email confirmation and PKCE verification callback |
+| Session persistence | Chunked Expo SecureStore on native; sessionStorage on web, shared localStorage PKCE verifier; no server-rendered browser storage |
+| Media | Supabase Edge Function, pinned ImageMagick WASM, private Supabase Storage |
+| Scheduling | Hourly pg_cron job creates idempotent semester reminders from configured semester dates |
+| Validation | Database constraints/authorization and Edge validation; Zod registration feedback in the client |
+| Checks | Vitest unit/API integration tests, pgTAP SQL tests, Expo lint, TypeScript |
+| Local tooling | Pinned Supabase CLI 2.122.1, Docker; independent project `tinir` |
 
-## 8. Non-Functional Requirements
+Function SDK dependencies and the WASM asset are generated from the npm lockfile before starting/serving/deploying functions. The Edge worker does not need to download npm packages at request time. Generated media assets are ignored by Git; run the preparation script before hosted function deployment too.
 
-Canonical source requirements are NFR1–NFR12 in REQUIREMENTS.md. Numeric targets beyond those sources (API latency, capacity, uptime, retention, accessibility level, and coverage) below are proposed engineering targets, not additional stakeholder approvals.
+## 3. Data Model
 
-| Area | Requirement |
+All application tables live in **`app_private`**, which is not exposed through the Data API. RLS is enabled on every application table, with raw schema/table access revoked for `anon` and `authenticated`. Only guarded public RPC functions and the server-only media function can access the records.
+
+| Entity | Fields / invariants |
 |---|---|
-| Performance | Listings page LCP ≤ 3 s on a simulated 4G mobile connection. API p95 ≤ 500 ms for read endpoints. |
-| Images | Serve resized, compressed images (WebP, responsive sizes) and lazy-load them below the fold. |
-| Scalability | Handle ≥ 500 concurrent users. Paginate every list endpoint. |
-| Availability | ≥ 99% uptime during the academic term (managed hosting). |
-| Compatibility | Latest 2 versions of Chrome, Safari (iOS), Firefox, and Edge. Viewport width from 360 px up. |
-| Accessibility | WCAG 2.1 AA for core flows. |
-| Maintainability | ESLint + Prettier, strict TypeScript, pull request reviews required on `main`. |
-| Consistency and feedback | Consistent role navigation and labels; readable text, clear empty/error/success states, and field-specific validation errors (NFR11–NFR12). |
-| Observability | Server error logging and basic analytics (page views, inquiries sent). |
-| Backups | Daily automated database backups, kept for 7 days. |
+| profiles | UUID FK to `auth.users`, immutable role (`student` / `owner`), name, role-specific contact/program fields, creation timestamp. Owner contact number required. |
+| listings | Owner FK, title/type/address/area, description/rules, coordinates, PHP centavo price, visibility, monthly/semester period, slots, availability, status, confirmation/update timestamps. |
+| listing_photos | Listing FK, generated storage key, unique slot 0–9, pending/ready state, timestamp. Only finalized photos are exposed. |
+| amenities / listing_amenities | Seeded names and unique listing/amenity pairs. |
+| inquiries | Listing/student FKs, question/interest type, message, Pending/Accepted/Rejected decision, independent read timestamp, decision/update timestamps. |
+| saved_listings | Unique student/listing pair and creation timestamp; archived listings are omitted on retrieval. |
+| campuses | Configured name and validated latitude/longitude; no fabricated production coordinates. |
+| semesters | Configured identifier and start/end timestamps; dates must come from the team’s academic calendar. |
+| listing_reminders | Unique listing/semester pair, creation and dismissal timestamps. |
+| photo_cleanup | Durable private object-deletion queue, acknowledged only after successful Storage removal. |
+| request_limits | Per-user/action/minute mutation counters, pruned by the scheduled job. |
 
-## 9. Testing Strategy
+```mermaid
+erDiagram
+  AUTH_USERS ||--|| PROFILES : identifies
+  PROFILES ||--o{ LISTINGS : owns
+  LISTINGS ||--o{ LISTING_PHOTOS : contains
+  LISTINGS ||--o{ LISTING_AMENITIES : has
+  AMENITIES ||--o{ LISTING_AMENITIES : describes
+  PROFILES ||--o{ INQUIRIES : sends
+  LISTINGS ||--o{ INQUIRIES : receives
+  PROFILES ||--o{ SAVED_LISTINGS : bookmarks
+  LISTINGS ||--o{ SAVED_LISTINGS : references
+  LISTINGS ||--o{ LISTING_REMINDERS : needs_confirmation
+  SEMESTERS ||--o{ LISTING_REMINDERS : schedules
+```
 
-| Level | Scope | Tool |
+Supabase Auth exclusively owns credential hashes, email identity, verification tokens, and sessions. A signup trigger validates/copies the initial Student/Owner role into the private profile. Later edits to user metadata never change that role. There is no client-facing role-change operation, admin signup role, custom password table, or duplicate verification-token table.
+
+Listings require a title, supported property type, and address. Coordinates must be within valid ranges and are required for publication. Visible prices require a positive integer centavo amount; hidden prices may omit it. Descriptions/rules have bounded lengths, slots are non-negative, and references/enum-like fields are constrained. An internal draft supports upload-before-publish; publishing requires at least one ready photo.
+
+Indexes cover listing discovery/owner queries and student/listing inquiry history. A partial unique index allows at most one Pending interest per student/listing. Listing locks serialize photo reservations and relevant owner mutations. Bookmark writes and repeat Pending interest submissions are idempotent.
+
+## 4. Public Interfaces
+
+### 4.1 Authentication
+
+Use Supabase Auth SDK operations for signup, password login, resend, PKCE code exchange, session retrieval, and logout. Verification redirects to `tinir://auth/callback` on native or `/auth/callback` on web. The callback is the only added feature route in this backend task; account forms and protected feature navigation remain their story issues.
+
+Email confirmation is enabled locally. Unconfirmed password login is rejected by Auth. Backend role actions also check the authoritative confirmation state, so possession of an old token cannot bypass verification. Owner contacts remain a login-only rule, separate from the verified-role requirement.
+
+Native sessions are chunked into small SecureStore records with a committed manifest; storage writes are serialized and logout removes the records. Web sessions are per-tab and are not serialized into server-rendered pages. Only the temporary PKCE code verifier uses localStorage so email confirmation can finish in another tab of the same browser. Auth uses one-hour access tokens, rotating refresh tokens, and a configured seven-day session timebox; logout clears the local session and asks Auth to revoke it. Already issued access tokens remain bounded by their expiry, rather than being falsely described as instantly revoked JWTs.
+
+### 4.2 Database RPCs
+
+| RPC | Access | Contract |
 |---|---|---|
-| Unit | Validation schemas, ownership/verification rules, price redaction/filtering, Haversine calculation, inquiry transitions, idempotent saves | Vitest |
-| Integration | API role/ownership enforcement, verification tokens, saved-listing isolation, private-price leakage through filters/caches, reminder deduplication against a test database | Vitest + test Postgres |
-| End-to-end | Guest browse/contact restriction; registration/verification/login; student search/filter, inquiry/status, save/unsave, campus distance; owner create/edit/hide price, availability, reminders, inquiry decisions, removal | Playwright |
-| Usability | Moderated tests with UPV students and owners | Manual (SUS questionnaire) |
+| `tinir_read(operation, args)` | Guest or authenticated, depending on operation | Guarded discovery/profile/role-scoped reads; JSON output |
+| `tinir_write(operation, args)` | Authenticated; verified role checked inside | Transactional, ownership-checked mutations; JSON output |
+| `tinir_media(operation, actor_id, args)` | Service role only | Photo reservation/finalization/cancellation/removal and visibility-checked storage-key lookup |
 
-Proposed target: ≥ 70% service-layer coverage. Verify all FR1–FR14 and NFR1–NFR12 acceptance criteria before delivery, including negative authorization and disclosure cases. Use fixtures for inquiry work before Sprint 4 listing creation, then validate the integrated owner-status flow in Sprint 5. Test the distance calculation with known coordinate pairs and same-point distance; test missing legacy coordinates explicitly.
+The application client only uses the first two. The Edge Function derives `actor_id` from `Auth.getUser()`; it never trusts a user ID submitted in an upload body.
 
-## 10. Deployment and Environments
+| Former REST capability | Selected operation |
+|---|---|
+| Public listings/search/filters | read `listings` |
+| Listing details | read `listing` |
+| Amenities and campus reference options | read `amenities`, `campuses` |
+| Current account | read `profile`; SDK handles sessions |
+| Owner management list | read `owner_listings` |
+| Create/edit/publish/archive | write `create_listing`, `update_listing`, `publish_listing`, `archive_listing` |
+| Student inquiry submission/history | write `send_inquiry`; read `student_inquiries` |
+| Owner inbox/read/decision | read `owner_inquiries`; write `update_inquiry` |
+| Bookmark / Saved Properties | write `save_listing`; read `saved_listings` |
+| Campus distance | read `distance` |
+| Semester reminders / reconfirmation | read `reminders`; write `reconfirm_listing` |
+| Photo upload/read/delete | Edge Function `media` |
 
-| Environment | Purpose | Trigger |
-|---|---|---|
-| Local | Development (Docker Postgres or a Supabase local instance) | — |
-| Preview | Per-pull-request review | Push to a PR branch |
-| Production | Live app | Merge to `main` |
+Read lists use `page` (default 1) and `page_size` (default 20, maximum 50), returning `{items, page, page_size}`. Discovery accepts keyword `q`, property `type`, min/max price in **centavos**, and amenity names. Listing mutations accept amenity IDs. Client service modules expose typed wrappers and generated RPC types.
 
-The CI pipeline runs install, lint, type-check, unit/integration tests, build, and then deploy. Database migrations run during deployment.
+Failed mutation operations roll back their changes inside a subtransaction and return a safe `{error: {code, message}}` envelope, allowing the rate-limit hit to commit. The client and media gateway check this envelope as well as transport errors. Authentication and already-exceeded rate-limit failures may still use transport errors. Application failures use `{error: {code, message, fields?}}` through `BackendError`. Deliberate authorization/validation errors have safe codes; raw SQL/provider diagnostics are sanitized. Zod supplies field-level registration feedback, but backend enforcement remains mandatory.
 
-## 11. Requirements Traceability
+### 4.3 Media
 
-| Source | PRD feature | Technical components |
-|---|---|---|
-| FR1 / US1 | F1.1–F1.2 | Public list/detail routes; published-only query; disclosure serializer |
-| FR2 / US6 | F1.3 | Guest inquiry login prompt; server authentication |
-| FR3 / US2 | F2 | Registration, role validation, verification tokens/provider |
-| FR4 / US3 | F3.1, F3.3 | Login/logout, secure sessions |
-| FR5 / US4 | F3.2 | Server RBAC and role navigation |
-| FR6 / US5, validation amendment | F4.2, F6.5 | Detail serializer, `price_visible`, hidden-price UI |
-| FR7 / US7 | F5.1–F5.2 | Inquiry creation and owner inbox storage |
-| FR8 / US8 | F5.3 | Student inquiry list; Pending/Accepted/Rejected badges |
-| FR9 / US9 | F6 | Listing create, image upload, validation |
-| FR10 / US10 | F7.1–F7.4 | Own listing CRUD/availability; soft removal |
-| FR11 / US11 | F7.5 | Owner inbox, owner-only status updates |
-| FR12 / US12 | F4.3–F4.4 | Keyword query and price/type/amenity filters |
-| FR13 / US13 | F4.7 | `saved_listings`, save/unsave API, Saved Properties page |
-| FR14 / US14 | F4.8 | Listing/campus coordinates, distance service and indicator |
-| NFR1–NFR2 | §8 | Mobile performance and viewport checks |
-| NFR3–NFR8 | §5, §8 | S1–S7, S10, S12; login-only owner contact serializer |
-| NFR9–NFR10 | §8 | Daily backup configuration and browser checks |
-| NFR11–NFR12 | §8 | Shared navigation/forms and clear operation feedback |
-| Activity 4 risks 1, 3 | F2.6, F7.6–F7.7 | Semester reminder job, email verification, owner-scoped inquiry history |
+The private `listing-photos` bucket permits no direct client upload/read/delete policies. A verified owner submits multipart `listing_id` and `file` to the `media` Edge Function. It reserves a photo slot under a listing lock, validates JPEG/PNG/WebP signatures against MIME type, bounds request size, decodes/re-encodes to WebP, orients/resizes to a maximum 1,600-pixel side, strips metadata, uploads, and finalizes metadata.
 
-## 12. Risks and Mitigations (Activity 4)
+Input limit: **5 MiB** and **8 million decoded pixels**, at most ten reserved/ready photos per listing. Failed requests cancel their reservation and attempt object cleanup. Stale pending reservations expire after ten minutes. Every photo metadata deletion durably queues the object key in private `photo_cleanup`; uploads retry up to 50 queued removals for their listing and acknowledge only after Storage succeeds. If no later upload occurs, an operator uses the server-only cleanup/cleanup_done operations to drain the queue. Crash-orphaned objects never become discovery records. A published listing cannot lose its last ready photo.
 
-| Risk | Source likelihood / effect | Mitigation |
-|---|---|---|
-| 1. Inaccurate/outdated listings | High / Serious | Update timestamps, semester reconfirmation reminders, simple availability toggles |
-| 2. Low owner adoption | High / Serious | Direct onboarding/consultations, free access tier, useful student-match examples |
-| 3. Fake accounts/spam/no-show inquiries | Moderate / Tolerable | Required registration email verification, RBAC, history limited to inquiries received by the owner |
-| 4. Scope creep | High / Serious | Follow US1–US14 and sprint goals; defer full chat and automated payments |
-| 5. Illness/scheduling conflicts | Moderate / Serious | Clear GitHub task ownership, modular code, asynchronous review |
-| 6. Data privacy non-compliance | Low / Catastrophic | Login-only contacts, minimal collection, secure database configuration |
-| 7. Mobile/browser rendering issues | Moderate / Tolerable | Responsive layout; test Chrome/Safari/Firefox/Edge and small screens. NFR2 guarantees 360 px and up; narrower widths receive best-effort checks |
-| 8. Database failure/data loss | Low / Catastrophic | Daily backups, reliable managed database, versioned schemas, restore checks |
-| 9. Image/storage bottlenecks | Moderate / Tolerable | Client/server size validation, compression, cloud buckets, upload limits |
-| 10. Unclear instructor/client expectations | Moderate / Serious | Regular activity-guide reviews and documented decisions/design artifacts |
+JSON `{operation: 'read', id}` returns a visibility-checked signed URL with 60-second expiry. An already-issued URL can remain valid until expiry after archiving; subsequent guest URL requests are denied. `{operation: 'delete', listing_id, id}` removes authorized metadata and the object; storage-cleanup failures are reported without re-exposing the photo.
 
-Semester dates, scheduler support, email delivery, and daily backup capability must be checked against the selected hosting plan before relying on them. Free-tier availability alone does not prove these controls exist.
+## 5. Confirmed Product Rules
 
-## 13. Open Technical Decisions
+- Guests see published listings and disclosed prices, with no owner contacts. Authenticated detail views may include owner contacts. Private prices are omitted for **all non-owners**, not returned as hidden numeric fields.
+- Prices default to hidden. Price-range filters exclude hidden-price records and never use their private amounts. Keyword matching covers title/address/area; combined type/amenity filters and pagination apply to published records only.
+- Verified Students can send questions/interest and access only their own saved properties and inquiry history. Owners see only inquiries received on their own listings.
+- Decisions are Pending → Accepted/Rejected, with a correction back to Pending before changing a completed decision. Read status is independent. An Accepted inquiry never reserves a room.
+- Distance is an approximate Haversine straight-line distance in km, rounded to two decimals. The campus point remains configuration; a missing reference returns a clear unavailable reason. No road-route or travel-time claim is made.
+- Hourly reminder generation uses configured active semesters and owner confirmation timestamps; unique listing/semester pairs prevent duplicate reminders. Reconfirmation dismisses owner reminders. There is no automatic listing expiry.
 
-1. Confirm the web client and stack, including ORM, auth, storage, and hosting. PWA installation is a future option.
-2. Confirm the campus reference point and straight-line versus routed distance method before FR14 acceptance.
-3. Confirm hidden-price filtering/sorting behavior and the proposed default-hidden setting.
-4. Confirm inquiry status correction rules and owner-scoped inquiry-history presentation; accepted inquiries do not reserve rooms.
-5. Select a scheduler and configure semester dates, reminder delivery, verification email expiry/resend limits, and daily backup/restore procedures.
-6. Additional owner verification, admin moderation, full chat, password reset, and account deletion are follow-up proposals with separate acceptance criteria, not committed US1–US14 features.
+## 6. Security and Non-Functional Requirements
 
-## 14. Source Basis and Delivery Plan
+| Source | Implementation / verification boundary |
+|---|---|
+| NFR3 HTTPS | Production client rejects non-HTTPS service URLs. Local HTTP is development-only. Hosted TLS validation remains deployment work. |
+| NFR4 credentials | Supabase Auth owns credentials; no password/hash in app tables or client responses. |
+| NFR5 role/ownership | Every protected RPC checks the trusted profile/confirmation state; private helpers have no public EXECUTE grants. Security-definer functions use fixed search paths and explicit scoped queries. |
+| NFR6 input safety | SQL checks/constraints and fixed parameterized operations; bounded media decoding; plain text data; no client-defined SQL or arbitrary identifiers. |
+| NFR7 privacy | Minimum profile fields, owner-scoped history, no privileged keys in Expo settings; runtime logs must omit credentials and personal data. |
+| NFR8 contacts | Server-created response allowlists; public raw tables are unavailable. Guest, owner, and student bypass cases are tested. |
+| NFR9 backups | Local private dump/restore tooling and a daily timer definition; hosted schedule, retention, media backups, and recovery ownership require deployment configuration. |
+| S9 abuse controls | Auth signup/sign-in/verification limits configured; 10 inquiry attempts and 10 upload reservations per user/minute; 30 other mutation attempts share one user/minute bucket. Failed operations consume a hit while their application writes roll back. The counter is enforced in the RPC gateway, including direct calls. |
+| NFR1–2, NFR10–12 | Backend supports pagination and safe errors, but mobile performance, responsive screens, browsers, and UI feedback require the feature screens and their own evidence. |
 
-Use PRD §12 for the supplied Sprint 1–5 schedule and PRD §§13–14 for source provenance and reconciliation decisions. ACT 2 IDs are preserved in REQUIREMENTS.md and mapped above. The local PDF snapshots take precedence over assumptions from the earlier draft; no live spreadsheet state or new stakeholder approval is asserted. The technical stack and engineering targets remain proposals.
+The earlier 500-concurrent-user, API-latency, 99%-uptime, WCAG, SUS, and coverage numbers remain proposed engineering targets, not results proven by backend setup. Full chat, password reset UI, admin moderation, account-deletion flows, draft-saving UI, sorting, and a full map browser remain follow-ups.
+
+## 7. Tests and Local Operation
+
+Use the commands in [BACKEND.md](BACKEND.md). Acceptance checks cover migration rebuilds, private-schema grants/RLS, Auth confirmation, immutable roles, owner/student isolation, hidden-price filtering, bookmarks, concurrency, inquiry transitions, media validation/storage, distances, and reminders. Test fixtures are synthetic and isolated to newly created account IDs.
+
+Local ports: API 54621, DB 54622, optional Studio 54623, captured email 54624, inspector 54628, shadow DB 54620. Never reset or reuse another project’s database. Keep unrelated containers/volumes intact and restore temporarily paused services after testing.
+
+Generated native folders remain unmanaged by hand. Packages are installed through Expo-compatible installation commands. Lint/typecheck are repository checks, not proof of native or end-to-end UI acceptance.
+
+## 8. Traceability and Remaining Configuration
+
+- Backend schema/architecture/setup: existing [#5](https://github.com/cmsc128-GitUpAndGo/Tinir/issues/5), [#6](https://github.com/cmsc128-GitUpAndGo/Tinir/issues/6), [#7](https://github.com/cmsc128-GitUpAndGo/Tinir/issues/7); domain model [#4](https://github.com/cmsc128-GitUpAndGo/Tinir/issues/4).
+- FR1–FR14 remain mapped to US1–US14 and issues #8–#21 in the [requirements matrix](REQUIREMENTS.md#4-backlog-traceability-and-delivery).
+- NFR1–NFR12 remain issues #22–#33; semester reminders remain [#34](https://github.com/cmsc128-GitUpAndGo/Tinir/issues/34). Backend evidence does not automatically close those screen/operational issues or bypass their review dependencies.
+- Configure real campus coordinates, semester dates, hosted project/region/plan, verification SMTP/redirects, HTTPS, backup retention/scheduling and storage recovery before production. No hosted resources or paid services are created by this local setup.
+
+## 9. Sources and Decisions
+
+Product scope remains grounded in the supplied ACT 2 validation, product backlog, interview/proposal, and Activity 4 PDFs described in PRD §§13–14. On 2026-11-07 the user approved the local Supabase backend plan, retaining Expo and selecting default-hidden prices, private-price filter exclusion, decision corrections through Pending, and straight-line distance. This is an architecture/implementation decision, not a new claim of stakeholder sign-off on every draft target.
+
+Implementation references: [Supabase Expo tutorial](https://supabase.com/docs/guides/getting-started/tutorials/with-expo-react-native), [database functions](https://supabase.com/docs/guides/database/functions), [Storage access](https://supabase.com/docs/guides/storage/security/access-control), [image processing](https://supabase.com/docs/guides/functions/examples/image-manipulation), and [Expo SecureStore](https://docs.expo.dev/versions/v58.0.0/sdk/securestore/).

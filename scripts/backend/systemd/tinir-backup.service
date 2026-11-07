@@ -1,0 +1,9 @@
+[Unit]
+Description=Back up the local Tinir Supabase database
+
+[Service]
+Type=oneshot
+# Replace /absolute/path/to/Tinir and /absolute/path/to/node when installing these example units.
+WorkingDirectory=/absolute/path/to/Tinir
+ExecStart=/absolute/path/to/node scripts/backend/backup.mjs dump
+UMask=0077

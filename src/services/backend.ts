@@ -1,7 +1,7 @@
 import { getSupabase } from '@/lib/supabase/client';
 import type { Json } from '@/lib/supabase/database.types';
 import type { Campus, Decision, Distance, Inquiry, Listing, ListingDetail, ListingFilters, ListingInput, ManagedListing, Page, PageRequest, Profile, Reminder } from './contracts';
-import { backendError } from './errors';
+import { backendError, BackendError } from './errors';
 
 type ReadOperation = 'listings' | 'listing' | 'amenities' | 'campuses' | 'profile' | 'owner_listings' | 'saved_listings' | 'student_inquiries' | 'owner_inquiries' | 'reminders' | 'distance';
 type WriteOperation = 'create_listing' | 'update_listing' | 'publish_listing' | 'archive_listing' | 'reconfirm_listing' | 'send_inquiry' | 'update_inquiry' | 'save_listing';
@@ -9,6 +9,10 @@ type WriteOperation = 'create_listing' | 'update_listing' | 'publish_listing' | 
 async function call<T>(method: 'tinir_read' | 'tinir_write', operation: ReadOperation | WriteOperation, args: object = {}): Promise<T> {
   const { data, error } = await getSupabase().rpc(method, { operation, args: args as Json });
   if (error) throw backendError(error);
+  if (data && typeof data === 'object' && !Array.isArray(data) && 'error' in data) {
+    const failure = data.error as { code: string; message: string };
+    throw new BackendError(failure.code, failure.message);
+  }
   return data as T;
 }
 export const listings = {

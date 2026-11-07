@@ -114,7 +114,7 @@ describe('log out (FR4)', () => {
     expect((await client.auth.getSession()).data.session).toBeNull();
 
     expect(await profileCode(replay)).toBe('UNAUTHENTICATED');
-    const write = await replay.rpc('tinir_write', { operation: 'save_listing', args: { listing_id: listingId } });
+    const write = await replay.rpc('tinir_write', { operation: 'save_listing', args: { id: listingId, saved: true } });
     expect(write.error ? JSON.parse(write.error.message).code : (write.data as { error: { code: string } }).error.code).toBe('UNAUTHENTICATED');
     const after = await replay.rpc('tinir_read', { operation: 'listing', args: { id: listingId } });
     expect(after.data).not.toHaveProperty('owner_contact');

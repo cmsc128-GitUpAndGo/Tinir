@@ -16,6 +16,18 @@ describe('native secure session storage', () => {
     expect(values.size).toBe(2);
     await storage.removeItem('auth'); expect(values.size).toBe(0);
   });
+  it('preserves emoji at every chunk boundary through native UTF-8 encoding', async () => {
+    for (const padding of [384, 385, 386, 784, 785]) {
+      const { store, values } = memory();
+      const storage = chunkedStorage({ ...store, setItem: async (key, value) => {
+        await store.setItem(key, new TextDecoder().decode(new TextEncoder().encode(value)));
+      } });
+      const session = JSON.stringify({ full_name: 'x'.repeat(padding) + '🍌'.repeat(500) });
+      await storage.setItem('auth', session);
+      expect(await storage.getItem('auth')).toBe(session);
+      expect([...values.values()].every((value) => new TextEncoder().encode(value).length < 2048)).toBe(true);
+    }
+  });
   it('preserves the previous committed session if a chunk write fails', async () => {
     const { values, store } = memory(); let fail = false;
     const storage = chunkedStorage({ ...store, setItem: async (k, v) => { if (fail && k.endsWith('.1')) throw new Error('keychain unavailable'); await store.setItem(k,v); } });

@@ -37,10 +37,20 @@ export function chunkedStorage(store: KeyValueStore): KeyValueStore {
     }),
     setItem: (key, value) => serial(async () => {
       const old = await manifest(key);
-      const m: Manifest = { version: 1, generation: `${Date.now()}.${sequence++}`, chunks: Math.max(1, Math.ceil(value.length / CHUNK_SIZE)) };
+      const chunks: string[] = [];
+      for (let start = 0; start < value.length;) {
+        let end = Math.min(start + CHUNK_SIZE, value.length);
+        // Keep UTF-16 surrogate pairs together before native UTF-8 encoding.
+        const last = value.charCodeAt(end - 1);
+        if (end < value.length && last >= 0xd800 && last <= 0xdbff) end--;
+        chunks.push(value.slice(start, end));
+        start = end;
+      }
+      if (!chunks.length) chunks.push('');
+      const m: Manifest = { version: 1, generation: `${Date.now()}.${sequence++}`, chunks: chunks.length };
       if (m.chunks > MAX_CHUNKS) throw new Error('Session exceeds secure storage capacity.');
       try {
-        for (let i = 0; i < m.chunks; i++) await store.setItem(chunkKey(key, m, i), value.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE));
+        for (let i = 0; i < m.chunks; i++) await store.setItem(chunkKey(key, m, i), chunks[i]);
         // Commit the pointer only after every chunk is durable; interrupted writes preserve the old session.
         await store.setItem(key, JSON.stringify(m));
       } catch (error) {

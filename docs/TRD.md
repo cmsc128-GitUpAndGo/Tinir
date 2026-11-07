@@ -73,7 +73,17 @@ erDiagram
   LISTINGS ||--o{ SAVED_LISTINGS : references
   LISTINGS ||--o{ LISTING_REMINDERS : needs_confirmation
   SEMESTERS ||--o{ LISTING_REMINDERS : schedules
+  LISTINGS ||--o{ PHOTO_CLEANUP : queues_deleted_objects
+  AUTH_USERS ||--o{ REQUEST_LIMITS : throttles
+  CAMPUSES {
+    uuid id PK
+    text name
+    numeric latitude
+    numeric longitude
+  }
 ```
+
+`CAMPUSES` has no foreign key: FR14 computes an approximate straight-line distance between a listing's coordinates and a configured campus reference point at read time. `PHOTO_CLEANUP.listing_id` is a plain reference so queued object keys survive listing deletion.
 
 Supabase Auth exclusively owns credential hashes, email identity, verification tokens, and sessions. A signup trigger validates/copies the initial Student/Owner role into the private profile. Later edits to user metadata never change that role. There is no client-facing role-change operation, admin signup role, custom password table, or duplicate verification-token table.
 

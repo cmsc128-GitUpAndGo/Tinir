@@ -2,8 +2,9 @@ import type { Listing, Page } from './contracts';
 
 export const FEED_PAGE_SIZE = 20;
 
-export interface FeedState {
-  items: Listing[];
+/** Any paged record list keyed by id: public listings, saved listings, inquiries, owner listings. */
+export interface FeedState<T extends { id: string } = Listing> {
+  items: T[];
   /** Last page successfully loaded; 0 before the first response. */
   page: number;
   hasMore: boolean;
@@ -11,14 +12,14 @@ export interface FeedState {
   error: string | null;
 }
 
-export const initialFeed: FeedState = { items: [], page: 0, hasMore: true, status: 'loading', error: null };
+export const initialFeed: FeedState<never> = { items: [], page: 0, hasMore: true, status: 'loading', error: null };
 
-export type FeedAction =
+export type FeedAction<T extends { id: string } = Listing> =
   | { type: 'start'; mode: 'loading' | 'refreshing' | 'loading-more' }
-  | { type: 'page'; page: Page<Listing> }
+  | { type: 'page'; page: Page<T> }
   | { type: 'fail'; message: string };
 
-export function feedReducer(state: FeedState, action: FeedAction): FeedState {
+export function feedReducer<T extends { id: string }>(state: FeedState<T>, action: FeedAction<T>): FeedState<T> {
   switch (action.type) {
     case 'start':
       return { ...state, status: action.mode, error: null };
@@ -42,7 +43,7 @@ export function feedReducer(state: FeedState, action: FeedAction): FeedState {
 }
 
 /** The page to request for a given action, or null when nothing should load. */
-export function nextPage(state: FeedState, mode: 'loading' | 'refreshing' | 'loading-more'): number | null {
+export function nextPage(state: FeedState<{ id: string }>, mode: 'loading' | 'refreshing' | 'loading-more'): number | null {
   if (mode !== 'loading-more') return 1;
   // A failed page can be retried; a page already in flight cannot be requested twice.
   if (!state.hasMore || (state.status !== 'ready' && state.status !== 'error')) return null;

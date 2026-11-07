@@ -204,10 +204,11 @@ Source NFR1–NFR12 are canonical in REQUIREMENTS.md. Additional usability/acces
 - Property owners are willing to create accounts and keep listings up to date.
 - The project is built by a 5-person student team within an academic term, so scope must stay limited.
 - The initial release has no budget for paid third-party services beyond free tiers.
+- **Target platforms (decided 2026-11-07):** One Expo codebase supports Android, iOS and web. The official deliverables are the **Android app** (shared as an APK built with EAS) and the **web app**. iOS users use the web app in Safari, optionally added to the Home Screen as a shortcut. No App Store release is planned, because it requires a paid Apple Developer account. iOS native builds remain possible later without code changes.
 
 ## 11. Open Questions
 
-1. Which hosted Supabase project/region/plan and production SMTP/redirect settings will be used? The selected client is Expo/React Native with Expo web support; the backend is Supabase Auth/Postgres/Storage/RPCs/Edge Functions. No separate Next.js server or hosted deployment is part of local setup.
+1. Which hosted Supabase project/region/plan, web hosting, and production SMTP/redirect settings will be used? The selected client is Expo/React Native, delivered as an Android app and a web app (see §10); the backend is Supabase Auth/Postgres/Storage/RPCs/Edge Functions. No separate Next.js server or hosted deployment is part of local setup.
 2. Which precise UPV campus point should distance calculations use? Interviews and adoption risks focus on Miagao; confirm any Iloilo City coverage before expanding.
 3. What exact campus reference coordinates should be configured? The user selected labeled approximate straight-line Haversine distance; routed travel distance/time remains outside the baseline.
 4. Do owners need proof-of-ownership checks beyond email verification, and should students require `@up.edu.ph` addresses?

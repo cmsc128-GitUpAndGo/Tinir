@@ -30,6 +30,7 @@ flowchart LR
 | Component | Selection |
 |---|---|
 | Client | Existing Expo SDK 58, TypeScript, React Native, Expo Router |
+| Deliverables | Android app (EAS-built APK) and web app. iOS is served by the web app in Safari or as a Home Screen shortcut; no App Store build. |
 | Database / migrations | Supabase PostgreSQL 17; versioned SQL migrations and generated public RPC types |
 | Application transport | `supabase-js` calling guarded RPCs; no direct client access to base tables |
 | Identity | Supabase Auth email/password with required email confirmation and PKCE verification callback |
@@ -39,6 +40,8 @@ flowchart LR
 | Validation | Database constraints/authorization and Edge validation; Zod registration feedback in the client |
 | Checks | Vitest unit/API integration tests, pgTAP SQL tests, Expo lint, TypeScript |
 | Local tooling | Pinned Supabase CLI 2.122.1, Docker; independent project `tinir` |
+
+On iOS, a Home Screen shortcut runs separately from Safari, with its own storage. Web sessions live in per-tab sessionStorage, so users of the shortcut sign in again each time it is reopened. The PKCE verifier saved at signup is also unavailable to Safari, so the emailed verification link must be opened in the same place signup began: tell iOS users to register in Safari. Revisit both if the shortcut becomes the main iOS entry point.
 
 Function SDK dependencies and the WASM asset are generated from the npm lockfile before starting/serving/deploying functions. The Edge worker does not need to download npm packages at request time. Generated media assets are ignored by Git; run the preparation script before hosted function deployment too.
 

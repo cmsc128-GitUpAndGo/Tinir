@@ -68,6 +68,17 @@ npm run backend:restore-other
 
 Pass the project IDs from their Supabase config files. The helper rejects Tinir itself and records only running containers matching the selected IDs. It preserves volumes and restores only the recorded set. A pending pause record prevents accidental overwriting. Normal startup never stops unrelated services automatically.
 
+## Seed demo listings
+
+Guest browsing needs published listings, and listing creation has no screen yet. With the local stack running, seed fictional data:
+
+```bash
+npm run backend:seed-demo            # skips if demo data exists
+npm run backend:seed-demo -- --reset # replaces only the demo data
+```
+
+It creates four confirmed owners on the reserved `demo.tinir.test` domain, 26 published listings (more than one 20-item page) across all three property types with both price visibilities and some marked Full, plus one draft and one archived listing that must never appear in discovery. Each listing gets a generated cover photo through the real media function. Owner passwords are random and printed once. The script refuses any target outside the local Tinir API port.
+
 ## Use the backend from Expo
 
 - `src/services/auth.ts`: register/login/logout/resend/PKCE code exchange. Registration returns a generic check-email message; confirmation is required for login and protected actions.

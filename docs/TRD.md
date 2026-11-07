@@ -91,6 +91,8 @@ Email confirmation is enabled locally. Unconfirmed password login is rejected by
 
 Native sessions are chunked into small SecureStore records with a committed manifest; storage writes are serialized and logout removes the records. Web sessions are per-tab and are not serialized into server-rendered pages. Only the temporary PKCE code verifier uses localStorage so email confirmation can finish in another tab of the same browser. Auth uses one-hour access tokens, rotating refresh tokens, and a configured seven-day session timebox; logout clears the local session first (so it works offline) and then asks Auth to revoke only that device's session. Protected RPCs and the media function also require the token's Auth session to still exist and be inside its timebox, so a logged-out access token is rejected at once even though the JWT has not expired; other devices stay logged in.
 
+Role navigation (FR5) comes from the server profile, never from client-editable sign-up metadata. Guests get Browse and Account; students add Saved and Inquiries; owners add My listings and Inquiries (`src/services/access.ts`). Native tabs for other roles are hidden and cannot be opened. On web every route stays registered, so a typed URL or deep link reaches the screen, whose role gate asks a guest to log in, tells a wrong role the page is not for them, or asks an unverified account to verify. These client checks only shape the UI: the database denies the same requests on its own (`tests/backend/role-access.test.ts`).
+
 ### 4.2 Database RPCs
 
 | RPC | Access | Contract |

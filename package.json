@@ -57,6 +57,7 @@
     "backend:reset": "supabase db reset --local",
     "backend:env": "node scripts/backend/env.mjs",
     "backend:types": "node scripts/backend/types.mjs",
+    "backend:seed-demo": "node scripts/backend/seed-demo.mjs",
     "backend:functions": "node scripts/backend/media-assets.mjs && supabase functions serve media",
     "backend:backup": "node scripts/backend/backup.mjs dump",
     "backend:restore-check": "node scripts/backend/backup.mjs verify",

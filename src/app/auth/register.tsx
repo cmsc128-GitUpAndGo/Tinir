@@ -87,6 +87,10 @@ export default function RegisterScreen() {
       {formError ? <Notice tone="error">{formError}</Notice> : null}
       <Button label="Create account" onPress={submit} busy={busy} />
       <ThemedText type="small" themeColor="textSecondary">
+        Already have an account?{' '}
+        <Link href="/auth/login" replace><ThemedText type="linkPrimary">Log in</ThemedText></Link>
+      </ThemedText>
+      <ThemedText type="small" themeColor="textSecondary">
         Didn’t get a verification email?{' '}
         <Link href="/auth/resend"><ThemedText type="linkPrimary">Resend it</ThemedText></Link>
       </ThemedText>

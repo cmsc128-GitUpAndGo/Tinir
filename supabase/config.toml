@@ -1,0 +1,97 @@
+project_id = "tinir"
+
+[api]
+enabled = true
+port = 54621
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+auto_expose_new_tables = false
+
+[db]
+port = 54622
+shadow_port = 54620
+major_version = 17
+health_timeout = "2m"
+
+[db.pooler]
+enabled = false
+port = 54629
+
+[db.migrations]
+enabled = true
+schema_paths = []
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[realtime]
+enabled = false
+
+[studio]
+enabled = false
+port = 54623
+api_url = "http://127.0.0.1"
+
+[local_smtp]
+enabled = true
+port = 54624
+
+[storage]
+enabled = true
+file_size_limit = "5MiB"
+
+[storage.s3_protocol]
+enabled = false
+
+[storage.analytics]
+enabled = false
+
+[storage.vector]
+enabled = false
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:8081"
+additional_redirect_urls = ["tinir://auth/callback", "http://127.0.0.1:8081/auth/callback", "http://localhost:8081/auth/callback"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+enable_anonymous_sign_ins = false
+minimum_password_length = 8
+password_requirements = "letters_digits"
+
+[auth.rate_limit]
+email_sent = 60
+sign_in_sign_ups = 30
+token_verifications = 30
+token_refresh = 150
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+secure_password_change = true
+max_frequency = "1m"
+otp_length = 6
+otp_expiry = 86400
+
+[auth.sessions]
+timebox = "168h"
+
+[edge_runtime]
+enabled = true
+policy = "per_worker"
+inspector_port = 54628
+deno_version = 2
+
+[functions.media]
+# Public photo reads are allowed; the function verifies authenticated writes with Auth.getUser().
+verify_jwt = false
+static_files = ["./functions/media/magick.wasm"]
+
+[analytics]
+enabled = false
+port = 54627

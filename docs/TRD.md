@@ -48,7 +48,7 @@ All application tables live in **`app_private`**, which is not exposed through t
 
 | Entity | Fields / invariants |
 |---|---|
-| profiles | UUID FK to `auth.users`, immutable role (`student` / `owner`), name, role-specific contact/program fields, creation timestamp. Owner contact number required. |
+| profiles | UUID FK to `auth.users`, immutable role (`student` / `owner`), name, role-specific contact/program fields, creation timestamp. Owner contact number required; contact numbers must be digits with an optional leading `+`, spaces or hyphens (7–20 characters); college/program is stored for students only. Any signup violating these rules is rejected by Auth. |
 | listings | Owner FK, title/type/address/area, description/rules, coordinates, PHP centavo price, visibility, monthly/semester period, slots, availability, status, confirmation/update timestamps. |
 | listing_photos | Listing FK, generated storage key, unique slot 0–9, pending/ready state, timestamp. Only finalized photos are exposed. |
 | amenities / listing_amenities | Seeded names and unique listing/amenity pairs. |

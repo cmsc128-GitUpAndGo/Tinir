@@ -36,7 +36,8 @@ function SignedOut() {
       <ThemedText themeColor="textSecondary">
         You’re browsing as a guest. Create an account to send inquiries as a student or post listings as a property owner.
       </ThemedText>
-      <Button label="Create an account" onPress={() => router.push('/auth/register')} />
+      <Button label="Log in" onPress={() => router.push('/auth/login')} />
+      <Button variant="secondary" label="Create an account" onPress={() => router.push('/auth/register')} />
       <Button variant="secondary" label="Resend verification email" onPress={() => router.push('/auth/resend')} />
     </View>
   );
@@ -58,7 +59,8 @@ function SignedIn({ userId }: { userId: string }) {
 
   const signOut = async () => {
     setLeaving(true);
-    try { await logout(); } catch { /* The local session is cleared even if revocation fails. */ } finally { setLeaving(false); }
+    // Logout removes the local session before contacting Auth, so a failed revocation still signs this device out.
+    try { await logout(); } catch { /* Nothing to show: the account screen already returns to the guest view. */ } finally { setLeaving(false); }
   };
 
   const current = profile?.userId === userId ? profile.value : null;

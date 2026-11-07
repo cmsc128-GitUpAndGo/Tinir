@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { Button, Notice } from '@/components/form';
@@ -28,6 +29,7 @@ export function CheckEmail({ email }: { email: string }) {
         disabled={remaining > 0}
         onPress={() => resend(email)}
       />
+      <Button variant="secondary" label="Go to log in" onPress={() => router.replace('/auth/login')} />
     </View>
   );
 }

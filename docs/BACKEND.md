@@ -70,7 +70,7 @@ Pass the project IDs from their Supabase config files. The helper rejects Tinir 
 
 ## Use the backend from Expo
 
-- `src/services/auth.ts`: register/login/logout/resend/PKCE code exchange. Registration returns a generic check-email message, including for an already-registered address or a repeat signup throttled by Auth's one-email-per-minute limit; confirmation is required for login and protected actions. Client validation (`src/services/registration.ts`) mirrors the server profile rules, which still reject signups that bypass the form.
+- `src/services/auth.ts`: register/login/logout/resend/PKCE code exchange. Login (`src/services/login.ts`) gives wrong passwords and unknown addresses one generic error; Auth only reports an unverified address after the password matches. Logout signs out this device only; `app_private.session_user()` makes protected RPCs reject the old token as soon as its session is gone. Registration returns a generic check-email message, including for an already-registered address or a repeat signup throttled by Auth's one-email-per-minute limit; confirmation is required for login and protected actions. Client validation (`src/services/registration.ts`) mirrors the server profile rules, which still reject signups that bypass the form.
 - `src/services/backend.ts`: typed listings, inquiries, bookmarks, reminders, current profile, campus reference and distance operations.
 - `src/services/media.ts`: processed upload, short-lived photo URL, and removal. Native upload accepts `{uri, name, type}`; web accepts a Blob.
 - `useSession()` exposes loading/current session through the root provider. This does not replace server authorization or implement the role screens.

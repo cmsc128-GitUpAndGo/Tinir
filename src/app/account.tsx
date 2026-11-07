@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,14 +8,12 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { useResendVerification } from '@/hooks/use-resend-verification';
-import { useSession } from '@/lib/supabase/session-provider';
+import { useViewer } from '@/lib/viewer-provider';
 import { logout } from '@/services/auth';
-import { currentProfile } from '@/services/backend';
 import type { Profile } from '@/services/contracts';
-import { backendError } from '@/services/errors';
 
 export default function AccountScreen() {
-  const { session, loading } = useSession();
+  const { viewer, reload } = useViewer();
   const insets = useSafeAreaInsets();
   return (
     <ThemedView style={styles.screen}>
@@ -24,7 +22,10 @@ export default function AccountScreen() {
         paddingBottom: insets.bottom + BottomTabInset + Spacing.four,
       }]}>
         <ThemedText type="subtitle" accessibilityRole="header">Account</ThemedText>
-        {loading ? <ActivityIndicator accessibilityLabel="Loading account" /> : session ? <SignedIn userId={session.user.id} /> : <SignedOut />}
+        {viewer.kind === 'loading' ? <ActivityIndicator accessibilityLabel="Loading account" />
+          : viewer.kind === 'guest' ? <SignedOut />
+          : viewer.kind === 'unknown' ? <ProfileError message={viewer.message} onRetry={reload} />
+          : <SignedIn current={viewer.profile} />}
       </ScrollView>
     </ThemedView>
   );
@@ -43,30 +44,26 @@ function SignedOut() {
   );
 }
 
-function SignedIn({ userId }: { userId: string }) {
-  const [profile, setProfile] = useState<{ userId: string; value: Profile } | null>(null);
-  const [failure, setFailure] = useState<{ userId: string; message: string } | null>(null);
+async function signOut(setLeaving: (busy: boolean) => void) {
+  setLeaving(true);
+  // Logout removes the local session before contacting Auth, so a failed revocation still signs this device out.
+  try { await logout(); } catch { /* Nothing to show: the account screen already returns to the guest view. */ } finally { setLeaving(false); }
+}
+
+function ProfileError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const [leaving, setLeaving] = useState(false);
+  return (
+    <View style={styles.section}>
+      <Notice tone="error">{message}</Notice>
+      <Button variant="secondary" label="Try again" onPress={onRetry} />
+      <Button variant="secondary" label="Log out" busy={leaving} onPress={() => signOut(setLeaving)} />
+    </View>
+  );
+}
+
+function SignedIn({ current }: { current: Profile }) {
   const [leaving, setLeaving] = useState(false);
   const { resend, busy, remaining, result } = useResendVerification();
-
-  useEffect(() => {
-    let active = true;
-    currentProfile()
-      .then((value) => { if (active) setProfile({ userId, value }); })
-      .catch((error) => { if (active) setFailure({ userId, message: backendError(error).error.message }); });
-    return () => { active = false; };
-  }, [userId]);
-
-  const signOut = async () => {
-    setLeaving(true);
-    // Logout removes the local session before contacting Auth, so a failed revocation still signs this device out.
-    try { await logout(); } catch { /* Nothing to show: the account screen already returns to the guest view. */ } finally { setLeaving(false); }
-  };
-
-  const current = profile?.userId === userId ? profile.value : null;
-  const error = failure?.userId === userId ? failure.message : null;
-  if (error) return <View style={styles.section}><Notice tone="error">{error}</Notice><Button variant="secondary" label="Log out" busy={leaving} onPress={signOut} /></View>;
-  if (!current) return <ActivityIndicator accessibilityLabel="Loading profile" />;
 
   return (
     <View style={styles.section}>
@@ -89,7 +86,7 @@ function SignedIn({ userId }: { userId: string }) {
             busy={busy} disabled={remaining > 0} onPress={() => resend(current.email)} />
         </>
       )}
-      <Button variant="secondary" label="Log out" busy={leaving} onPress={signOut} />
+      <Button variant="secondary" label="Log out" busy={leaving} onPress={() => signOut(setLeaving)} />
     </View>
   );
 }

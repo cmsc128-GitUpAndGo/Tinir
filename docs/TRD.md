@@ -33,7 +33,7 @@ flowchart LR
 | Database / migrations | Supabase PostgreSQL 17; versioned SQL migrations and generated public RPC types |
 | Application transport | `supabase-js` calling guarded RPCs; no direct client access to base tables |
 | Identity | Supabase Auth email/password with required email confirmation and PKCE verification callback |
-| Session persistence | Chunked Expo SecureStore on native; sessionStorage on web; no server-rendered browser storage |
+| Session persistence | Chunked Expo SecureStore on native; sessionStorage on web, shared localStorage PKCE verifier; no server-rendered browser storage |
 | Media | Supabase Edge Function, pinned ImageMagick WASM, private Supabase Storage |
 | Scheduling | Hourly pg_cron job creates idempotent semester reminders from configured semester dates |
 | Validation | Database constraints/authorization and Edge validation; Zod registration feedback in the client |
@@ -57,6 +57,7 @@ All application tables live in **`app_private`**, which is not exposed through t
 | campuses | Configured name and validated latitude/longitude; no fabricated production coordinates. |
 | semesters | Configured identifier and start/end timestamps; dates must come from the team’s academic calendar. |
 | listing_reminders | Unique listing/semester pair, creation and dismissal timestamps. |
+| photo_cleanup | Durable private object-deletion queue, acknowledged only after successful Storage removal. |
 | request_limits | Per-user/action/minute mutation counters, pruned by the scheduled job. |
 
 ```mermaid
@@ -88,7 +89,7 @@ Use Supabase Auth SDK operations for signup, password login, resend, PKCE code e
 
 Email confirmation is enabled locally. Unconfirmed password login is rejected by Auth. Backend role actions also check the authoritative confirmation state, so possession of an old token cannot bypass verification. Owner contacts remain a login-only rule, separate from the verified-role requirement.
 
-Native sessions are chunked into small SecureStore records with a committed manifest; storage writes are serialized and logout removes the records. Web sessions are per-tab and are not serialized into server-rendered pages. Auth uses one-hour access tokens, rotating refresh tokens, and a configured seven-day session timebox; logout clears the local session and asks Auth to revoke it. Already issued access tokens remain bounded by their expiry, rather than being falsely described as instantly revoked JWTs.
+Native sessions are chunked into small SecureStore records with a committed manifest; storage writes are serialized and logout removes the records. Web sessions are per-tab and are not serialized into server-rendered pages. Only the temporary PKCE code verifier uses localStorage so email confirmation can finish in another tab of the same browser. Auth uses one-hour access tokens, rotating refresh tokens, and a configured seven-day session timebox; logout clears the local session and asks Auth to revoke it. Already issued access tokens remain bounded by their expiry, rather than being falsely described as instantly revoked JWTs.
 
 ### 4.2 Database RPCs
 
@@ -117,13 +118,13 @@ The application client only uses the first two. The Edge Function derives `actor
 
 Read lists use `page` (default 1) and `page_size` (default 20, maximum 50), returning `{items, page, page_size}`. Discovery accepts keyword `q`, property `type`, min/max price in **centavos**, and amenity names. Listing mutations accept amenity IDs. Client service modules expose typed wrappers and generated RPC types.
 
-Application failures use `{error: {code, message, fields?}}` through `BackendError`. Deliberate authorization/validation errors have safe codes; raw SQL/provider diagnostics are sanitized. Zod supplies field-level registration feedback, but backend enforcement remains mandatory.
+Failed mutation operations roll back their changes inside a subtransaction and return a safe `{error: {code, message}}` envelope, allowing the rate-limit hit to commit. The client and media gateway check this envelope as well as transport errors. Authentication and already-exceeded rate-limit failures may still use transport errors. Application failures use `{error: {code, message, fields?}}` through `BackendError`. Deliberate authorization/validation errors have safe codes; raw SQL/provider diagnostics are sanitized. Zod supplies field-level registration feedback, but backend enforcement remains mandatory.
 
 ### 4.3 Media
 
 The private `listing-photos` bucket permits no direct client upload/read/delete policies. A verified owner submits multipart `listing_id` and `file` to the `media` Edge Function. It reserves a photo slot under a listing lock, validates JPEG/PNG/WebP signatures against MIME type, bounds request size, decodes/re-encodes to WebP, orients/resizes to a maximum 1,600-pixel side, strips metadata, uploads, and finalizes metadata.
 
-Input limit: **5 MiB** and **8 million decoded pixels**, at most ten reserved/ready photos per listing. Failed requests cancel their reservation and attempt object cleanup. Stale pending reservations expire after ten minutes; crash-orphaned private objects require operator cleanup and never become discovery records. A published listing cannot lose its last ready photo.
+Input limit: **5 MiB** and **8 million decoded pixels**, at most ten reserved/ready photos per listing. Failed requests cancel their reservation and attempt object cleanup. Stale pending reservations expire after ten minutes. Every photo metadata deletion durably queues the object key in private `photo_cleanup`; uploads retry up to 50 queued removals for their listing and acknowledge only after Storage succeeds. If no later upload occurs, an operator uses the server-only cleanup/cleanup_done operations to drain the queue. Crash-orphaned objects never become discovery records. A published listing cannot lose its last ready photo.
 
 JSON `{operation: 'read', id}` returns a visibility-checked signed URL with 60-second expiry. An already-issued URL can remain valid until expiry after archiving; subsequent guest URL requests are denied. `{operation: 'delete', listing_id, id}` removes authorized metadata and the object; storage-cleanup failures are reported without re-exposing the photo.
 
@@ -147,7 +148,7 @@ JSON `{operation: 'read', id}` returns a visibility-checked signed URL with 60-s
 | NFR7 privacy | Minimum profile fields, owner-scoped history, no privileged keys in Expo settings; runtime logs must omit credentials and personal data. |
 | NFR8 contacts | Server-created response allowlists; public raw tables are unavailable. Guest, owner, and student bypass cases are tested. |
 | NFR9 backups | Local private dump/restore tooling and a daily timer definition; hosted schedule, retention, media backups, and recovery ownership require deployment configuration. |
-| S9 abuse controls | Auth signup/sign-in/verification limits configured; 10 inquiry/upload attempts per successful minute window and 30 other mutation operations per user/minute. Invalid writes roll back and do not consume counters. |
+| S9 abuse controls | Auth signup/sign-in/verification limits configured; 10 inquiry attempts and 10 upload reservations per user/minute; 30 other mutation attempts share one user/minute bucket. Failed operations consume a hit while their application writes roll back. The counter is enforced in the RPC gateway, including direct calls. |
 | NFR1–2, NFR10–12 | Backend supports pagination and safe errors, but mobile performance, responsive screens, browsers, and UI feedback require the feature screens and their own evidence. |
 
 The earlier 500-concurrent-user, API-latency, 99%-uptime, WCAG, SUS, and coverage numbers remain proposed engineering targets, not results proven by backend setup. Full chat, password reset UI, admin moderation, account-deletion flows, draft-saving UI, sorting, and a full map browser remain follow-ups.

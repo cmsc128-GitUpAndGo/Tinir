@@ -57,16 +57,16 @@ Integration tests refuse a target outside the Tinir local API port and create/re
 
 ### Coexisting with the other local projects
 
-The optional helpers used for this workstation’s three existing Hack Iloilo stacks are explicit and reversible:
+The optional helpers can pause explicitly selected Supabase projects and restore only containers they recorded:
 
 ```bash
-npm run backend:pause-other
+npm run backend:pause-other -- <other-project-id> [another-project-id]
 # Start Tinir and run checks.
 npm run backend:stop
 npm run backend:restore-other
 ```
 
-They record only the running containers matching those known project names, never delete volumes, leave Portainer alone, and restore only the recorded set. A pending pause record prevents accidental overwriting. Normal startup never stops unrelated services automatically.
+Pass the project IDs from their Supabase config files. The helper rejects Tinir itself and records only running containers matching the selected IDs. It preserves volumes and restores only the recorded set. A pending pause record prevents accidental overwriting. Normal startup never stops unrelated services automatically.
 
 ## Use the backend from Expo
 
@@ -77,9 +77,9 @@ They record only the running containers matching those known project names, neve
 
 Amounts are integer **PHP centavos**. Discovery filters use the same units. Hidden amounts are absent from non-owner data; show “Contact owner for price” when `price_visible` is false. Backend errors expose `.error.code`, `.error.message`, and optional `.error.fields`; do not display raw provider/SQL errors.
 
-Owner flow: create internal draft → upload at least one photo → publish → edit/availability/archive. Uploads accept JPEG/PNG/WebP at most 5 MiB and 8 million pixels, re-encode to metadata-free WebP, and enforce ten slots. Signed photo URLs expire after 60 seconds and must be refreshed; cached URLs may work until that expiry after archiving.
+Owner flow: create internal draft → upload at least one photo → publish → edit/availability/archive. Uploads accept JPEG/PNG/WebP at most 5 MiB and 8 million pixels, re-encode to metadata-free WebP, and enforce ten slots. Deleted/expired photo metadata queues object keys durably. Uploads retry up to 50 queued removals for that listing, acknowledging them only after Storage succeeds. With no later upload, an operator must process `app_private.photo_cleanup` through the server-only `tinir_media` cleanup/cleanup_done operations; keys remain private and retryable. Signed photo URLs expire after 60 seconds and must be refreshed; cached URLs may work until that expiry after archiving.
 
-Verification callback: native `tinir://auth/callback`, web `/auth/callback`. PKCE confirmation must finish on the device/browser that initiated signup. Test emails are captured locally; successful local verification does not prove hosted SMTP or handset delivery.
+Verification callback: native `tinir://auth/callback`, web `/auth/callback`. PKCE confirmation must finish in the browser/device that initiated signup. On web it can open a new tab: only the temporary PKCE verifier is shared through localStorage; session tokens remain in per-tab sessionStorage. Test emails are captured locally; successful local verification does not prove hosted SMTP or handset delivery.
 
 ## Configure campus and semester reference data
 

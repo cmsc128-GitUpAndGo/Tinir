@@ -89,7 +89,7 @@ Acceptance criteria: Core guest, student, and owner flows work at 360 px and rep
 
 ### NFR3: All communication uses HTTPS.
 
-Acceptance criteria: Deployed app/API endpoints use HTTPS. Native sessions use secure device storage; the selected web client uses per-tab session storage. Any future browser-cookie transport must use Secure/HTTP-only settings. Local HTTP is a development-only exception.
+Acceptance criteria: Deployed app/API endpoints use HTTPS. Native sessions use secure device storage; the selected web client uses per-tab session storage, with only the temporary PKCE verifier shared across tabs. Any future browser-cookie transport must use Secure/HTTP-only settings. Local HTTP is a development-only exception.
 
 ### NFR4: Passwords are stored securely hashed.
 
@@ -165,7 +165,7 @@ These retain useful detail from the earlier draft without changing canonical FR/
 
 - **Registration:** Full name, email, and password for both roles; contact number required for owners, optional for students; college/program optional for students. Reject invalid/duplicate emails. Proposed password minimum: 8 characters, with a letter and a number.
 - **Verification:** Supabase-managed single-use confirmation tokens, 24-hour local confirmation expiry, and rate-limited resend. Unconfirmed password login is rejected by Supabase Auth; server role actions separately verify authoritative confirmation state. Unverified users can browse, log out, and complete verification; protected role actions remain blocked. Supabase owns credentials and verification tokens; the app stores a linked private profile.
-- **Sessions:** Native SecureStore persistence supports chunked session records; web uses per-tab sessionStorage with no server-rendered token state. Supabase uses one-hour access tokens, rotating refresh tokens, and a configured seven-day session timebox. Logout clears persisted state; issued JWTs remain bounded by their expiry. Duplicate signup feedback is generic.
+- **Sessions:** Native SecureStore persistence supports chunked session records; web uses per-tab sessionStorage with no server-rendered token state; only the temporary PKCE verifier uses localStorage to support confirmation in a new tab. Supabase uses one-hour access tokens, rotating refresh tokens, and a configured seven-day session timebox. Logout clears persisted state; issued JWTs remain bounded by their expiry. Duplicate signup feedback is generic.
 - **Listing fields:** Title, property type (bedspace/room/apartment), address, description, amenities, house rules, photos, availability, coordinates, and last-updated date. Title, type, address, valid coordinates, and availability are required to publish; photo minimum is proposed below. Price period supports monthly/semester.
 - **Prices:** Positive PHP amount when supplied; store integer centavos. Selected default: price hidden until the owner opts in. Hidden/omitted prices do not block publishing. Visible prices require an amount. Only the owning owner may see private amounts in management views.
 - **Price discovery:** Selected price-range filters exclude hidden-price listings. Proposed optional price sorting puts hidden-price listings last, ordered by posting date, never by their private amounts. The optional sorting proposal remains unimplemented; baseline discovery uses posting date and never private-price ordering.

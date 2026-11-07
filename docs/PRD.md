@@ -4,9 +4,9 @@
 |---|---|
 | **Product** | Tinir (working title) |
 | **Document** | Product Requirements Document |
-| **Version** | 0.2 (Aligned draft) |
-| **Date** | 2026-11-05 |
-| **Status** | Aligned with supplied interviews, ACT 2 validation, product backlog, and Activity 4 risk plan; design proposals remain subject to team agreement |
+| **Version** | 0.3 (Supabase backend decision) |
+| **Date** | 2026-11-07 |
+| **Status** | Product baseline aligned to source activities; Expo + local Supabase backend selected by the user; remaining UI/hosted acceptance is tracked separately |
 | **Team** | Arellano, Junel · Blancada, Eusef Karl · De Asis, Dejel Cyrus · Placer, Josef Magloire · Vincoy, Claire Dane |
 
 ---
@@ -124,12 +124,12 @@ Use the backlog’s **High / Medium / Low** priorities and **Sprint 1–5** sche
 |---|---|
 | F4.1 | A student can view listings of bedspaces, rooms, and apartments. |
 | F4.2 | A student can open a listing to see its owner-disclosed rental price (or "Contact owner for price"), location, description, house rules, amenities, photos, availability, and last-updated date. |
-| F4.3 | A student can filter listings by property type, price range, and amenities (FR12 / US12, High, Sprint 3). Proposed handling: a price-range filter excludes hidden-price listings to prevent disclosure through filtering. |
+| F4.3 | A student can filter listings by property type, price range, and amenities (FR12 / US12, High, Sprint 3). Selected handling: a price-range filter excludes hidden-price listings to prevent disclosure through filtering. |
 | F4.4 | A student can search listings by keyword in the title, address, or area (FR12 / US12, High, Sprint 3). |
 | F4.5 | (P1) A student can sort listings by price or by date posted. |
 | F4.6 | (P2) A student can view listings on a map. |
 | F4.7 | A student can save/unsave listings and revisit them on a Saved Properties page (FR13 / US13, Medium, Sprint 4). |
-| F4.8 | A student can calculate accommodation-to-campus distance and see a distance indicator (FR14 / US14, Low, Sprint 4). Proposed method: approximate straight-line distance, clearly labeled; not a travel-time or road-route estimate. |
+| F4.8 | A student can calculate accommodation-to-campus distance and see a distance indicator (FR14 / US14, Low, Sprint 4). Selected method: approximate straight-line distance, clearly labeled; not a travel-time or road-route estimate. |
 
 #### F5. Inquire About a Property (backlog scope)
 
@@ -207,12 +207,12 @@ Source NFR1–NFR12 are canonical in REQUIREMENTS.md. Additional usability/acces
 
 ## 11. Open Questions
 
-1. Which client platform will the team select? The TRD proposes responsive web, with PWA installation as a future option; neither is a confirmed stakeholder requirement.
+1. Which hosted Supabase project/region/plan and production SMTP/redirect settings will be used? The selected client is Expo/React Native with Expo web support; the backend is Supabase Auth/Postgres/Storage/RPCs/Edge Functions. No separate Next.js server or hosted deployment is part of local setup.
 2. Which precise UPV campus point should distance calculations use? Interviews and adoption risks focus on Miagao; confirm any Iloilo City coverage before expanding.
-3. Is straight-line distance sufficient, or is routed road/walking distance required? FR14 does not specify the method.
+3. What exact campus reference coordinates should be configured? The user selected labeled approximate straight-line Haversine distance; routed travel distance/time remains outside the baseline.
 4. Do owners need proof-of-ownership checks beyond email verification, and should students require `@up.edu.ph` addresses?
 5. Should listings expire if owners do not respond to semester reminders? Reminders are in the risk plan; automatic expiry is not.
-6. Confirm the implementation proposals for hidden-price filtering, inquiry status transitions, and owner-scoped inquiry history in §14. These details are not fully specified in the PDFs.
+6. Which remaining usability, capacity, retention, and operational targets will be adopted for deployment? These remain proposals; local backend checks do not prove production or screen acceptance.
 
 ## 12. Delivery Plan (Supplied Product Backlog)
 
@@ -242,8 +242,14 @@ Source PDFs were supplied from `/home/dejel/Documents/UPV/TINIR-128/`. This revi
 
 ## 14. Reconciliation Decisions
 
-- **Price visibility:** Apply ACT 2’s validation amendment to the earlier requirement and backlog wording. An owner may keep the stored price private; hiding it must not prevent publishing. Proposed default: hidden until the owner opts in. The exact storage and filter behavior is a design proposal, not quoted stakeholder wording.
-- **Inquiry status:** Use the backlog’s Pending/Accepted/Rejected workflow instead of the earlier draft’s New/Read/Replied/Closed. Proposed transitions: Pending to Accepted or Rejected; an owner may return a decision to Pending to correct it. Read timestamps are separate metadata. An accepted inquiry does not reserve accommodation.
+- **Price visibility:** Apply ACT 2’s validation amendment to the earlier requirement and backlog wording. An owner may keep the stored price private; hiding it must not prevent publishing. The user selected default-hidden prices and exclusion of hidden-price records from price-range filters for backend implementation. These are recorded implementation decisions, not quotes from the stakeholder validation report.
+- **Inquiry status:** Use the backlog’s Pending/Accepted/Rejected workflow instead of the earlier draft’s New/Read/Replied/Closed. Selected transitions: Pending to Accepted or Rejected; an owner may return a decision to Pending to correct it. Read timestamps are separate metadata. An accepted inquiry does not reserve accommodation.
 - **Priorities:** Preserve scheduled US12–US14, including Low-priority distance calculation. They are not deferred to a future release.
 - **Risk controls:** Require email verification and semester reminders as Activity 4 mitigations. Limit owner access to inquiry history on their own listings; broader student profiling would require separate agreement.
 - **Research requests versus delivery scope:** Interviews mention reservations, viewing appointments, distance filters, and chat. Only requirements carried into ACT 2/backlog or explicit risk mitigations are included in the baseline. Full chat and scheduling remain proposed follow-ups.
+
+## 15. Selected Backend Implementation
+
+On 2026-11-07 the user approved a Supabase-only, local-first backend supporting FR1–FR14, retaining the existing Expo client. Supabase manages credentials/verification and PostgreSQL access; private tables are exposed only through guarded RPC operations, with an Edge Function validating and processing photos. The user also selected hidden-price defaults/filter exclusion, corrections through Pending, and approximate straight-line distance. Real campus reference points and semester dates remain configurable rather than fabricated. See [TRD](TRD.md) and [Backend setup](BACKEND.md).
+
+This task adds backend services and a minimal verification callback, not all feature screens. The original user-story/NFR issues remain open until their complete acceptance criteria are met. Architecture/schema/setup work links to existing issues #4–#7; UI, hosted services, actual email delivery, backups, performance, and device acceptance retain their separate verification boundaries.

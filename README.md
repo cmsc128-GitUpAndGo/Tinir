@@ -1,6 +1,6 @@
 # Tinir
 
-Tinir is an accommodation finder for UPV students and property owners. This repository currently contains an Expo starter using React Native, TypeScript, and Expo Router.
+Tinir is an accommodation finder for UPV students and property owners. The client uses Expo, React Native, TypeScript, and Expo Router, with a local Supabase backend. Feature screens are being developed through the linked backlog.
 
 ## Requirements
 
@@ -26,6 +26,18 @@ npm ci
 ```
 
 If you already have this repository open, run `npm ci` from its root folder. Expo is already initialized here; `create-expo-app` is only needed when creating a new project.
+
+## Set up the local backend
+
+For authentication, database operations, and processed listing photos, install/start Docker and run:
+
+```bash
+npm run backend:start
+npm run backend:env
+npm run backend:types
+```
+
+Then start Expo below. See [Backend setup](docs/BACKEND.md) for captured verification email, emulator/phone addresses, migration/reset instructions, tests, backups, and hosted-project preparation. The backend uses its own ports beginning at 54621 and never reuses another project’s database.
 
 ## Start the app
 

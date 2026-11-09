@@ -10,11 +10,16 @@ import { BottomTabInset, Spacing } from '@/constants/theme';
 import { useResendVerification } from '@/hooks/use-resend-verification';
 import { useViewer } from '@/lib/viewer-provider';
 import { logout } from '@/services/auth';
+import { LOGOUT_UNCONFIRMED } from '@/services/login';
 import type { Profile } from '@/services/contracts';
 
 export default function AccountScreen() {
   const { viewer, reload } = useViewer();
   const insets = useSafeAreaInsets();
+  // Kept here, not in SignedIn, because logging out unmounts SignedIn before the warning can be read.
+  // Each logout sets it afresh, so an earlier warning never outlives a later confirmed logout.
+  const [logoutWarning, setLogoutWarning] = useState(false);
+  const onLogout = (revoked: boolean) => setLogoutWarning(!revoked);
   return (
     <ThemedView style={styles.screen}>
       <ScrollView contentContainerStyle={[styles.content, {
@@ -23,17 +28,18 @@ export default function AccountScreen() {
       }]}>
         <ThemedText type="subtitle" accessibilityRole="header">Account</ThemedText>
         {viewer.kind === 'loading' ? <ActivityIndicator accessibilityLabel="Loading account" />
-          : viewer.kind === 'guest' ? <SignedOut />
-          : viewer.kind === 'unknown' ? <ProfileError message={viewer.message} onRetry={reload} />
-          : <SignedIn current={viewer.profile} />}
+          : viewer.kind === 'guest' ? <SignedOut logoutWarning={logoutWarning} />
+          : viewer.kind === 'unknown' ? <ProfileError message={viewer.message} onRetry={reload} onLogout={onLogout} />
+          : <SignedIn current={viewer.profile} onLogout={onLogout} />}
       </ScrollView>
     </ThemedView>
   );
 }
 
-function SignedOut() {
+function SignedOut({ logoutWarning }: { logoutWarning: boolean }) {
   return (
     <View style={styles.section}>
+      {logoutWarning ? <Notice tone="error">{LOGOUT_UNCONFIRMED}</Notice> : null}
       <ThemedText themeColor="textSecondary">
         You’re browsing as a guest. Create an account to send inquiries as a student or post listings as a property owner.
       </ThemedText>
@@ -44,24 +50,34 @@ function SignedOut() {
   );
 }
 
-async function signOut(setLeaving: (busy: boolean) => void) {
+type OnLogout = (revoked: boolean) => void;
+
+async function signOut(setLeaving: (busy: boolean) => void, onLogout: OnLogout) {
   setLeaving(true);
-  // Logout removes the local session before contacting Auth, so a failed revocation still signs this device out.
-  try { await logout(); } catch { /* Nothing to show: the account screen already returns to the guest view. */ } finally { setLeaving(false); }
+  // Logout removes the local session before contacting Auth, so a failed revocation still signs this device out,
+  // but the user is told the server could not confirm it (NFR12).
+  try {
+    const { revoked } = await logout();
+    onLogout(revoked);
+  } catch {
+    onLogout(false);
+  } finally {
+    setLeaving(false);
+  }
 }
 
-function ProfileError({ message, onRetry }: { message: string; onRetry: () => void }) {
+function ProfileError({ message, onRetry, onLogout }: { message: string; onRetry: () => void; onLogout: OnLogout }) {
   const [leaving, setLeaving] = useState(false);
   return (
     <View style={styles.section}>
       <Notice tone="error">{message}</Notice>
       <Button variant="secondary" label="Try again" onPress={onRetry} />
-      <Button variant="secondary" label="Log out" busy={leaving} onPress={() => signOut(setLeaving)} />
+      <Button variant="secondary" label="Log out" busy={leaving} onPress={() => signOut(setLeaving, onLogout)} />
     </View>
   );
 }
 
-function SignedIn({ current }: { current: Profile }) {
+function SignedIn({ current, onLogout }: { current: Profile; onLogout: OnLogout }) {
   const [leaving, setLeaving] = useState(false);
   const { resend, busy, remaining, result } = useResendVerification();
 
@@ -86,7 +102,7 @@ function SignedIn({ current }: { current: Profile }) {
             busy={busy} disabled={remaining > 0} onPress={() => resend(current.email)} />
         </>
       )}
-      <Button variant="secondary" label="Log out" busy={leaving} onPress={() => signOut(setLeaving)} />
+      <Button variant="secondary" label="Log out" busy={leaving} onPress={() => signOut(setLeaving, onLogout)} />
     </View>
   );
 }

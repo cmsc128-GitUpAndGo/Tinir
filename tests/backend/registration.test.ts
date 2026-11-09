@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { randomUUID } from 'node:crypto';
 import { localStatus } from '../../scripts/backend/local-status.mjs';
-import { signupError } from '../../src/services/registration';
+import { signupOutcome } from '../../src/services/registration';
 
 // FR3 end to end against local Auth and the captured-mail server. Every address is synthetic and removed afterwards.
 const status = localStatus();
@@ -121,8 +121,8 @@ describe('registration and email verification (FR3)', () => {
     const first = await signUp(browser(), email, { role: 'student', full_name: 'Fictional Student' });
     const second = await signUp(browser(), email, { role: 'owner', full_name: 'Fictional Owner', contact_number: '09170000000' });
     expect(first.error).toBeNull();
-    // Auth may throttle the repeat; the app must still report the same generic success.
-    expect(second.error ? signupError(second.error) : null).toBeNull();
+    // Auth may throttle the repeat; the app must still report success without an error, the same as a new address.
+    expect(signupOutcome(second.error).ok).toBe(true);
     const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
     expect(data.users.filter((user) => user.email === email)).toHaveLength(1);
     // The original role is kept; the duplicate cannot switch it.

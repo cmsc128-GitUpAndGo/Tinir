@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { INVALID_LOGIN, loginError, validateLogin } from '../src/services/login';
+import { INVALID_LOGIN, loginError, signOutDevice, validateLogin } from '../src/services/login';
 
 describe('validateLogin (FR4)', () => {
   it('normalises the email and keeps the password exactly as typed', () => {
@@ -27,5 +27,17 @@ describe('loginError (FR4 / NFR5)', () => {
   });
   it('falls back to the generic request failure', () => {
     expect(loginError(new Error('socket hang up')).error.code).toBe('REQUEST_FAILED');
+  });
+});
+
+describe('signOutDevice (FR4 / NFR12)', () => {
+  it('reports a confirmed revocation', async () => {
+    const auth = { signOut: async () => ({ error: null }) };
+    expect(await signOutDevice(auth)).toEqual({ revoked: true });
+  });
+  it('reports an unconfirmed revocation when Auth is offline or failing', async () => {
+    for (const error of [{ name: 'AuthRetryableFetchError', status: 0 }, { name: 'AuthApiError', status: 503 }]) {
+      expect(await signOutDevice({ signOut: async () => ({ error }) })).toEqual({ revoked: false });
+    }
   });
 });

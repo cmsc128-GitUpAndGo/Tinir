@@ -48,7 +48,7 @@ All application tables live in **`app_private`**, which is not exposed through t
 
 | Entity | Fields / invariants |
 |---|---|
-| profiles | UUID FK to `auth.users`, immutable role (`student` / `owner`), name, role-specific contact/program fields, creation timestamp. Owner contact number required. |
+| profiles | UUID FK to `auth.users`, immutable role (`student` / `owner`), name, role-specific contact/program fields, creation timestamp. Owner contact number required; contact numbers must be digits with an optional leading `+`, spaces or hyphens (7–20 characters); college/program is stored for students only. Any signup violating these rules is rejected by Auth. |
 | listings | Owner FK, title/type/address/area, description/rules, coordinates, PHP centavo price, visibility, monthly/semester period, slots, availability, status, confirmation/update timestamps. |
 | listing_photos | Listing FK, generated storage key, unique slot 0–9, pending/ready state, timestamp. Only finalized photos are exposed. |
 | amenities / listing_amenities | Seeded names and unique listing/amenity pairs. |
@@ -89,7 +89,9 @@ Use Supabase Auth SDK operations for signup, password login, resend, PKCE code e
 
 Email confirmation is enabled locally. Unconfirmed password login is rejected by Auth. Backend role actions also check the authoritative confirmation state, so possession of an old token cannot bypass verification. Owner contacts remain a login-only rule, separate from the verified-role requirement.
 
-Native sessions are chunked into small SecureStore records with a committed manifest; storage writes are serialized and logout removes the records. Web sessions are per-tab and are not serialized into server-rendered pages. Only the temporary PKCE code verifier uses localStorage so email confirmation can finish in another tab of the same browser. Auth uses one-hour access tokens, rotating refresh tokens, and a configured seven-day session timebox; logout clears the local session and asks Auth to revoke it. Already issued access tokens remain bounded by their expiry, rather than being falsely described as instantly revoked JWTs.
+Native sessions are chunked into small SecureStore records with a committed manifest; storage writes are serialized and logout removes the records. Web sessions are per-tab and are not serialized into server-rendered pages. Only the temporary PKCE code verifier uses localStorage so email confirmation can finish in another tab of the same browser. Auth uses one-hour access tokens, rotating refresh tokens, and a configured seven-day session timebox; logout clears the local session first (so it works offline) and then asks Auth to revoke only that device's session. Protected RPCs and the media function also require the token's Auth session to still exist and be inside its timebox, so a logged-out access token is rejected at once even though the JWT has not expired; other devices stay logged in.
+
+Role navigation (FR5) comes from the server profile, never from client-editable sign-up metadata. Guests get Browse and Account; students add Saved and Inquiries; owners add My listings and Inquiries (`src/services/access.ts`). Native tabs for other roles are hidden and cannot be opened. On web every route stays registered, so a typed URL or deep link reaches the screen, whose role gate asks a guest to log in, tells a wrong role the page is not for them, or asks an unverified account to verify. These client checks only shape the UI: the database denies the same requests on its own (`tests/backend/role-access.test.ts`).
 
 ### 4.2 Database RPCs
 

@@ -68,9 +68,20 @@ npm run backend:restore-other
 
 Pass the project IDs from their Supabase config files. The helper rejects Tinir itself and records only running containers matching the selected IDs. It preserves volumes and restores only the recorded set. A pending pause record prevents accidental overwriting. Normal startup never stops unrelated services automatically.
 
+## Seed demo listings
+
+Guest browsing needs published listings, and listing creation has no screen yet. With the local stack running, seed fictional data:
+
+```bash
+npm run backend:seed-demo            # skips if demo data exists
+npm run backend:seed-demo -- --reset # replaces only the demo data
+```
+
+It creates four confirmed owners on the reserved `demo.tinir.test` domain, 26 published listings (more than one 20-item page) across all three property types with both price visibilities and some marked Full, plus one draft and one archived listing that must never appear in discovery. Each listing gets a generated cover photo through the real media function. Owner passwords are random and printed once. The script refuses any target outside the local Tinir API port.
+
 ## Use the backend from Expo
 
-- `src/services/auth.ts`: register/login/logout/resend/PKCE code exchange. Registration returns a generic check-email message; confirmation is required for login and protected actions.
+- `src/services/auth.ts`: register/login/logout/resend/PKCE code exchange. Login (`src/services/login.ts`) gives wrong passwords and unknown addresses one generic error; Auth only reports an unverified address after the password matches. Logout signs out this device only; `app_private.session_user()` makes protected RPCs reject the old token as soon as its session is gone. Registration returns a generic check-email message, including for an already-registered address or a repeat signup throttled by Auth's one-email-per-minute limit; confirmation is required for login and protected actions. Client validation (`src/services/registration.ts`) mirrors the server profile rules, which still reject signups that bypass the form.
 - `src/services/backend.ts`: typed listings, inquiries, bookmarks, reminders, current profile, campus reference and distance operations.
 - `src/services/media.ts`: processed upload, short-lived photo URL, and removal. Native upload accepts `{uri, name, type}`; web accepts a Blob.
 - `useSession()` exposes loading/current session through the root provider. This does not replace server authorization or implement the role screens.

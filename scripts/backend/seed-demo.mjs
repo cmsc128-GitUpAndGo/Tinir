@@ -30,17 +30,32 @@ async function demoUsers() {
   }
 }
 
+const quote = (value) => `'${String(value).replaceAll("'", "''")}'`;
+
 async function reset(users) {
-  const ids = users.map((user) => `'${user.id}'`).join(',');
+  const ids = users.map((user) => quote(user.id)).join(',');
   const listingIds = sql(`SELECT id FROM app_private.listings WHERE owner_id IN (${ids});`).split('\n').filter(Boolean);
+  // Only keys whose Storage objects were actually removed may leave the cleanup queue.
+  const removed = [];
   for (const id of listingIds) {
-    const { data } = await admin.storage.from('listing-photos').list(id);
-    if (data?.length) await admin.storage.from('listing-photos').remove(data.map((file) => `${id}/${file.name}`));
+    const bucket = admin.storage.from('listing-photos');
+    const { data, error } = await bucket.list(id);
+    if (error) throw new Error(`Could not list photos for demo listing ${id}: ${error.message}`);
+    if (!data?.length) continue;
+    const keys = data.map((file) => `${id}/${file.name}`);
+    const { error: removeError } = await bucket.remove(keys);
+    if (removeError) throw new Error(`Could not remove photos for demo listing ${id}: ${removeError.message}`);
+    removed.push(...keys);
   }
+  // Deleting a listing queues its photo keys in photo_cleanup. Acknowledge only this reset's demo listings
+  // and removed keys; every other queued key is another owner's pending Storage deletion and must stay.
+  const acknowledge = listingIds.length && removed.length
+    ? `DELETE FROM app_private.photo_cleanup WHERE listing_id IN (${listingIds.map(quote).join(',')}) AND storage_key IN (${removed.map(quote).join(',')});`
+    : '';
   sql(`DELETE FROM app_private.inquiries WHERE student_id IN (${ids}) OR listing_id IN (SELECT id FROM app_private.listings WHERE owner_id IN (${ids}));
        DELETE FROM app_private.saved_listings WHERE student_id IN (${ids});
        DELETE FROM app_private.listings WHERE owner_id IN (${ids});
-       DELETE FROM app_private.photo_cleanup WHERE listing_id NOT IN (SELECT id FROM app_private.listings);`);
+       ${acknowledge}`);
   for (const user of users) await admin.auth.admin.deleteUser(user.id);
   console.log(`Removed ${users.length} demo accounts and ${listingIds.length} demo listings.`);
 }

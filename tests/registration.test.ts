@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { signupError, validateRegistration, type RegistrationForm } from '../src/services/registration';
+import { signupError, signupOutcome, validateRegistration, type RegistrationForm } from '../src/services/registration';
 
 const student: RegistrationForm = { role: 'student', full_name: ' Ana Reyes ', email: ' Ana@Example.TEST ', password: 'secret123' };
 const owner: RegistrationForm = { role: 'owner', full_name: 'Ben Cruz', email: 'ben@example.test', password: 'secret123', contact_number: '0917 123 4567' };
@@ -47,7 +47,16 @@ describe('signup error mapping', () => {
   it('treats an existing email like success so accounts are not disclosed', () => {
     expect(signupError({ code: 'user_already_exists' })).toBeNull();
     expect(signupError({ code: 'email_exists' })).toBeNull();
-    expect(signupError({ code: 'over_email_send_rate_limit', status: 429 })).toBeNull();
+    expect(signupOutcome({ code: 'user_already_exists' })).toEqual({ ok: true, delivery: 'sent' });
+    expect(signupOutcome(null)).toEqual({ ok: true, delivery: 'sent' });
+  });
+
+  it('makes no delivery claim when Auth throttles email, whether per address or project-wide', () => {
+    // Auth uses this one code for the per-address cooldown and for the project's email-send quota.
+    const quota = { code: 'over_email_send_rate_limit', status: 429, message: 'email rate limit exceeded' };
+    expect(signupOutcome(quota)).toEqual({ ok: true, delivery: 'unconfirmed' });
+    const cooldown = { ...quota, message: 'For security purposes, you can only request this after 52 seconds.' };
+    expect(signupOutcome(cooldown)).toEqual({ ok: true, delivery: 'unconfirmed' });
   });
 
   it('maps provider and server-rule failures to safe messages', () => {

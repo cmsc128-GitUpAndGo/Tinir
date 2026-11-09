@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import { getSupabase } from '@/lib/supabase/client';
 import { backendError, BackendError } from './errors';
 import { loginError, validateLogin, type LoginForm } from './login';
-import { REGISTERED_MESSAGE, signupError, validateRegistration, type RegistrationForm } from './registration';
+import { REGISTERED_MESSAGE, signupOutcome, validateRegistration, type RegistrationForm } from './registration';
 
 export type { LoginForm } from './login';
 export type { Registration, RegistrationForm } from './registration';
@@ -16,10 +16,10 @@ export async function register(input: RegistrationForm) {
   if (!checked.ok) throw new BackendError('INVALID_INPUT', 'Check the highlighted fields.', checked.fields);
   const { email, password, ...data } = checked.value;
   const { error } = await getSupabase().auth.signUp({ email, password, options: { data, emailRedirectTo: redirectTo() } });
-  const failure = error ? signupError(error) : null;
-  if (failure) throw failure;
+  const outcome = signupOutcome(error);
+  if (!outcome.ok) throw outcome.error;
   // Duplicate addresses get the same result, so the form never discloses whether an account exists.
-  return { message: REGISTERED_MESSAGE };
+  return { message: REGISTERED_MESSAGE, delivery: outcome.delivery };
 }
 export async function login(input: LoginForm) {
   const checked = validateLogin(input);

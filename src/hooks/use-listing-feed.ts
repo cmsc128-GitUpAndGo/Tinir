@@ -3,9 +3,7 @@ import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { isBackendConfigured } from '@/lib/supabase/client';
 import { listings } from '@/services/backend';
 import { backendError } from '@/services/errors';
-import { FEED_PAGE_SIZE, feedReducer, initialFeed, nextPage } from '@/services/listing-feed';
-
-type Mode = 'loading' | 'refreshing' | 'loading-more';
+import { FEED_PAGE_SIZE, feedReducer, initialFeed, nextPage, retryMode, type FeedMode as Mode } from '@/services/listing-feed';
 
 /** Paged public listings (FR1). The server returns only published listings and guest-safe fields. */
 export function useListingFeed() {
@@ -49,6 +47,6 @@ export function useListingFeed() {
     ...state,
     refresh: useCallback(() => load('refreshing'), [load]),
     loadMore: useCallback(() => load('loading-more'), [load]),
-    retry: useCallback(() => load(latest.current.items.length ? 'loading-more' : 'loading'), [load]),
+    retry: useCallback(() => load(retryMode(latest.current)), [load]),
   };
 }

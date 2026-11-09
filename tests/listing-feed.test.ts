@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Listing } from '../src/services/contracts';
-import { feedReducer, initialFeed, nextPage, type FeedState } from '../src/services/listing-feed';
+import { feedReducer, initialFeed, nextPage, retryMode, type FeedState } from '../src/services/listing-feed';
 
 const listing = (id: string): Listing => ({
   id, title: id, property_type: 'room', area: 'Miagao', price_visible: false, price_period: 'monthly',
@@ -41,5 +41,42 @@ describe('listing feed pagination (FR1)', () => {
     expect(ids(state)).toEqual(['a']);
     expect(state.error).toBe('offline');
     expect(nextPage(state, 'loading-more')).toBe(2);
+  });
+
+  describe('retry repeats the failed request', () => {
+    const full = () => feedReducer(initialFeed, { type: 'page', page: { items: [listing('a'), listing('b')], page: 1, page_size: 2 } });
+    const failRefresh = (state: FeedState) =>
+      feedReducer(feedReducer(state, { type: 'start', mode: 'refreshing' }), { type: 'fail', message: 'offline' });
+
+    it('reloads page 1 after a failed refresh of a full page, not page 2', () => {
+      const state = failRefresh(full());
+      expect(ids(state)).toEqual(['a', 'b']);
+      expect(retryMode(state)).toBe('refreshing');
+      expect(nextPage(state, retryMode(state))).toBe(1);
+    });
+
+    it('reloads page 1 after a failed refresh following the final short page', () => {
+      let state = feedReducer(full(), { type: 'page', page: { items: [listing('c')], page: 2, page_size: 2 } });
+      expect(state.hasMore).toBe(false);
+      state = failRefresh(state);
+      expect(retryMode(state)).toBe('refreshing');
+      expect(nextPage(state, retryMode(state))).toBe(1);
+      state = feedReducer(state, { type: 'page', page: { items: [listing('z')], page: 1, page_size: 2 } });
+      expect(ids(state)).toEqual(['z']);
+      expect(state.error).toBeNull();
+    });
+
+    it('requests the same next page after a failed page load', () => {
+      let state = feedReducer(full(), { type: 'start', mode: 'loading-more' });
+      state = feedReducer(state, { type: 'fail', message: 'offline' });
+      expect(retryMode(state)).toBe('loading-more');
+      expect(nextPage(state, retryMode(state))).toBe(2);
+    });
+
+    it('repeats the first load when nothing has loaded', () => {
+      const state = feedReducer(feedReducer(initialFeed, { type: 'start', mode: 'loading' }), { type: 'fail', message: 'offline' });
+      expect(retryMode(state)).toBe('loading');
+      expect(nextPage(state, retryMode(state))).toBe(1);
+    });
   });
 });

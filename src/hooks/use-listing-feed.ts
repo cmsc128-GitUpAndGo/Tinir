@@ -4,9 +4,15 @@ import { isBackendConfigured } from '@/lib/supabase/client';
 import { listings } from '@/services/backend';
 import type { Page, PageRequest } from '@/services/contracts';
 import { backendError } from '@/services/errors';
-import { FEED_PAGE_SIZE, feedReducer, initialFeed, nextPage, type FeedState } from '@/services/listing-feed';
-
-type Mode = 'loading' | 'refreshing' | 'loading-more';
+import {
+  FEED_PAGE_SIZE,
+  feedReducer,
+  initialFeed,
+  nextPage,
+  retryMode,
+  type FeedMode as Mode,
+  type FeedState,
+} from '@/services/listing-feed';
 
 /**
  * Paged records from one backend read. `fetchPage` must be stable (a module-level function), and the
@@ -53,7 +59,7 @@ export function usePagedFeed<T extends { id: string }>(fetchPage: (page: PageReq
     ...state,
     refresh: useCallback(() => load('refreshing'), [load]),
     loadMore: useCallback(() => load('loading-more'), [load]),
-    retry: useCallback(() => load(latest.current.items.length ? 'loading-more' : 'loading'), [load]),
+    retry: useCallback(() => load(retryMode(latest.current)), [load]),
   };
 }
 

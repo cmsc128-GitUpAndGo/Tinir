@@ -84,6 +84,11 @@ export default function RegisterScreen() {
         )}
       </View>
 
+      <ThemedText type="small" themeColor="textSecondary">
+        We use your details to verify your account and connect students with owners. Owner contact details are shown
+        only to logged-in users. By creating an account, you agree to the{' '}
+        <Link href="/auth/privacy"><ThemedText type="linkPrimary">privacy notice and terms</ThemedText></Link>.
+      </ThemedText>
       {formError ? <Notice tone="error">{formError}</Notice> : null}
       <Button label="Create account" onPress={submit} busy={busy} />
       <ThemedText type="small" themeColor="textSecondary">

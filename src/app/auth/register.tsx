@@ -9,7 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { register, type RegistrationForm } from '@/services/auth';
 import { backendError } from '@/services/errors';
-import { validateRegistration, type FieldErrors } from '@/services/registration';
+import { validateRegistration, type FieldErrors, type SignupDelivery } from '@/services/registration';
 
 const empty: RegistrationForm = { role: null, full_name: '', email: '', password: '', contact_number: '', college_program: '' };
 
@@ -18,7 +18,7 @@ export default function RegisterScreen() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [registered, setRegistered] = useState<string | null>(null);
+  const [registered, setRegistered] = useState<{ email: string; delivery: SignupDelivery } | null>(null);
 
   const set = <K extends keyof RegistrationForm>(key: K, value: RegistrationForm[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -36,8 +36,8 @@ export default function RegisterScreen() {
     }
     setBusy(true);
     try {
-      await register(form);
-      setRegistered(checked.value.email);
+      const { delivery } = await register(form);
+      setRegistered({ email: checked.value.email, delivery });
       // Drop the password from memory once the account request is sent.
       setForm(empty);
     } catch (error) {
@@ -52,7 +52,7 @@ export default function RegisterScreen() {
   if (registered) {
     return (
       <AuthScreen title="Verify your email">
-        <CheckEmail email={registered} />
+        <CheckEmail email={registered.email} delivery={registered.delivery} />
       </AuthScreen>
     );
   }

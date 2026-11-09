@@ -52,6 +52,26 @@ export function validateRegistration(form: RegistrationForm):
 export const REGISTERED_MESSAGE = 'Check your email to verify your account.';
 
 /**
+ * Whether a verification email can be said to have gone out. `unconfirmed` makes no delivery claim: it covers
+ * Auth's email throttle, which uses one code for both the per-address cooldown and the project-wide send quota.
+ */
+export type SignupDelivery = 'sent' | 'unconfirmed';
+
+/**
+ * The result of a signUp call: a delivery state the form can show, or a safe error. Neither result reveals
+ * whether an email is already registered.
+ */
+export function signupOutcome(error: { code?: string; status?: number; message?: string } | null):
+  { ok: true; delivery: SignupDelivery } | { ok: false; error: BackendError } {
+  if (!error) return { ok: true, delivery: 'sent' };
+  // The same code means "this address was just emailed" or "the project hit its email quota", so no email may
+  // have been sent. Report that neutrally; telling the two apart would also reveal a recent signup.
+  if (error.code === 'over_email_send_rate_limit') return { ok: true, delivery: 'unconfirmed' };
+  const failure = signupError(error);
+  return failure ? { ok: false, error: failure } : { ok: true, delivery: 'sent' };
+}
+
+/**
  * Maps a Supabase signUp failure to safe feedback. Returns null when the failure must look like success,
  * so the form never reveals whether an email is already registered.
  */
@@ -59,10 +79,9 @@ export function signupError(error: { code?: string; status?: number; message?: s
   switch (error.code) {
     case 'user_already_exists':
     case 'email_exists':
-    // Auth sends one email per address per minute, so a repeat signup is throttled only when the
-    // address was just used. Reporting the throttle would reveal that; an email did just go out.
-    case 'over_email_send_rate_limit':
       return null;
+    case 'over_email_send_rate_limit':
+      return new BackendError('RATE_LIMITED', 'Verification emails are busy. Wait a few minutes, then resend.');
     case 'weak_password':
       return new BackendError('INVALID_INPUT', 'Choose a stronger password.', { password: 'Use at least 8 characters with a letter and a number.' });
     case 'email_address_invalid':

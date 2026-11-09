@@ -3,7 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { localStatus } from '../../scripts/backend/local-status.mjs';
-import { loginError } from '../../src/services/login';
+import { loginError, signOutDevice } from '../../src/services/login';
 
 // FR4 end to end against local Auth, the RPC gateway and the media function. Accounts are synthetic and removed afterwards.
 const status = localStatus();
@@ -12,9 +12,10 @@ const key: string = status.PUBLISHABLE_KEY ?? status.ANON_KEY;
 const admin = createClient(url, status.SERVICE_ROLE_KEY ?? status.SECRET_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const users: string[] = [];
 
-function device(): SupabaseClient {
+function device(fetchImpl?: typeof fetch): SupabaseClient {
   const memory = new Map<string, string>();
   return createClient(url, key, {
+    ...(fetchImpl ? { global: { fetch: fetchImpl } } : {}),
     auth: {
       persistSession: true, autoRefreshToken: false, detectSessionInUrl: false,
       storage: { getItem: (k) => memory.get(k) ?? null, setItem: (k, v) => { memory.set(k, v); }, removeItem: (k) => { memory.delete(k); } },
@@ -122,6 +123,25 @@ describe('log out (FR4)', () => {
     expect(await mediaStatus(access)).toBe(401);
     const refreshed = await device().auth.refreshSession({ refresh_token: refresh });
     expect(refreshed.error).not.toBeNull();
+  });
+
+  it('signs the device out but reports an unconfirmed revocation when Auth is unreachable or failing', async () => {
+    const failures: Record<string, () => Promise<Response>> = {
+      offline: async () => { throw new TypeError('fetch failed'); },
+      '5xx': async () => new Response(JSON.stringify({ code: 503, msg: 'unavailable' }), { status: 503, headers: { 'content-type': 'application/json' } }),
+    };
+    for (const [name, fail] of Object.entries(failures)) {
+      const fetchLogout: typeof fetch = (input, init) => (String(input instanceof Request ? input.url : input).includes('/auth/v1/logout') ? fail() : fetch(input, init));
+      const client = device(fetchLogout);
+      const { data } = await client.auth.signInWithPassword(student);
+      const access = data.session!.access_token;
+
+      expect(await signOutDevice(client.auth), name).toEqual({ revoked: false });
+      expect((await client.auth.getSession()).data.session, name).toBeNull();
+      // The server never heard the logout, so the old token still works; this is why the app must warn.
+      expect(await profileCode(withToken(access)), name).toBe('OK');
+      await admin.auth.admin.signOut(access, 'local');
+    }
   });
 
   it('leaves the same user\'s other devices logged in', async () => {

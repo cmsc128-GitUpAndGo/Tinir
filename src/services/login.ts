@@ -34,3 +34,17 @@ export function loginError(error: unknown): BackendError {
   if (code?.startsWith('over_')) return new BackendError('RATE_LIMITED', 'Too many login attempts. Wait a minute and try again.');
   return backendError(error);
 }
+
+export const LOGOUT_UNCONFIRMED =
+  'You’re logged out on this device, but we couldn’t confirm that the server ended your session. ' +
+  'It may stay valid until it expires. Check your connection; if this is a shared device, close the browser or app.';
+
+/**
+ * Logs this device out (FR4). `scope: 'local'` removes the stored session before Auth is contacted, so the device is
+ * always signed out; an error means only the server-side revocation is unconfirmed (offline, 5xx), and the caller
+ * must say so rather than imply the old tokens are dead (NFR12).
+ */
+export async function signOutDevice(auth: { signOut(options: { scope: 'local' }): Promise<{ error: unknown }> }) {
+  const { error } = await auth.signOut({ scope: 'local' });
+  return { revoked: !error };
+}

@@ -10,6 +10,7 @@ import { BottomTabInset, Spacing } from '@/constants/theme';
 import { useResendVerification } from '@/hooks/use-resend-verification';
 import { useSession } from '@/lib/supabase/session-provider';
 import { logout } from '@/services/auth';
+import { LOGOUT_UNCONFIRMED } from '@/services/login';
 import { currentProfile } from '@/services/backend';
 import type { Profile } from '@/services/contracts';
 import { backendError } from '@/services/errors';
@@ -17,6 +18,9 @@ import { backendError } from '@/services/errors';
 export default function AccountScreen() {
   const { session, loading } = useSession();
   const insets = useSafeAreaInsets();
+  // Kept here, not in SignedIn, because logging out unmounts SignedIn before the warning can be read.
+  // Each logout sets it afresh, so an earlier warning never outlives a later confirmed logout.
+  const [logoutWarning, setLogoutWarning] = useState(false);
   return (
     <ThemedView style={styles.screen}>
       <ScrollView contentContainerStyle={[styles.content, {
@@ -24,15 +28,22 @@ export default function AccountScreen() {
         paddingBottom: insets.bottom + BottomTabInset + Spacing.four,
       }]}>
         <ThemedText type="subtitle" accessibilityRole="header">Account</ThemedText>
-        {loading ? <ActivityIndicator accessibilityLabel="Loading account" /> : session ? <SignedIn userId={session.user.id} /> : <SignedOut />}
+        {loading ? (
+          <ActivityIndicator accessibilityLabel="Loading account" />
+        ) : session ? (
+          <SignedIn userId={session.user.id} onLogout={(revoked) => setLogoutWarning(!revoked)} />
+        ) : (
+          <SignedOut logoutWarning={logoutWarning} />
+        )}
       </ScrollView>
     </ThemedView>
   );
 }
 
-function SignedOut() {
+function SignedOut({ logoutWarning }: { logoutWarning: boolean }) {
   return (
     <View style={styles.section}>
+      {logoutWarning ? <Notice tone="error">{LOGOUT_UNCONFIRMED}</Notice> : null}
       <ThemedText themeColor="textSecondary">
         You’re browsing as a guest. Create an account to send inquiries as a student or post listings as a property owner.
       </ThemedText>
@@ -43,7 +54,7 @@ function SignedOut() {
   );
 }
 
-function SignedIn({ userId }: { userId: string }) {
+function SignedIn({ userId, onLogout }: { userId: string; onLogout: (revoked: boolean) => void }) {
   const [profile, setProfile] = useState<{ userId: string; value: Profile } | null>(null);
   const [failure, setFailure] = useState<{ userId: string; message: string } | null>(null);
   const [leaving, setLeaving] = useState(false);
@@ -59,8 +70,16 @@ function SignedIn({ userId }: { userId: string }) {
 
   const signOut = async () => {
     setLeaving(true);
-    // Logout removes the local session before contacting Auth, so a failed revocation still signs this device out.
-    try { await logout(); } catch { /* Nothing to show: the account screen already returns to the guest view. */ } finally { setLeaving(false); }
+    // Logout removes the local session before contacting Auth, so a failed revocation still signs this device out,
+    // but the user is told the server could not confirm it (NFR12).
+    try {
+      const { revoked } = await logout();
+      onLogout(revoked);
+    } catch {
+      onLogout(false);
+    } finally {
+      setLeaving(false);
+    }
   };
 
   const current = profile?.userId === userId ? profile.value : null;

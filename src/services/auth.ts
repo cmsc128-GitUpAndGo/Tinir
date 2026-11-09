@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { Platform } from 'react-native';
 import { getSupabase } from '@/lib/supabase/client';
 import { backendError, BackendError } from './errors';
-import { loginError, validateLogin, type LoginForm } from './login';
+import { loginError, signOutDevice, validateLogin, type LoginForm } from './login';
 import { REGISTERED_MESSAGE, signupOutcome, validateRegistration, type RegistrationForm } from './registration';
 
 export type { LoginForm } from './login';
@@ -32,9 +32,9 @@ export async function login(input: LoginForm) {
  * Log out this device. The local session is removed before the network call, so logout never depends on
  * connectivity; Auth then deletes the server session, which makes protected RPCs reject the old token.
  */
+/** Always signs this device out; `revoked` is false when the server could not confirm the session ended. */
 export async function logout() {
-  const { error } = await getSupabase().auth.signOut({ scope: 'local' });
-  if (error) throw backendError(error);
+  return signOutDevice(getSupabase().auth);
 }
 export async function resendVerification(email: string) {
   email = email.trim().toLowerCase();

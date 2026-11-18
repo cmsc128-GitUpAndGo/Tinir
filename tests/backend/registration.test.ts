@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { randomUUID } from 'node:crypto';
 import { localStatus } from '../../scripts/backend/local-status.mjs';
 import { signupOutcome } from '../../src/services/registration';
+import { verificationRedirect } from '../../src/services/return-path';
 
 // FR3 end to end against local Auth and the captured-mail server. Every address is synthetic and removed afterwards.
 const status = localStatus();
@@ -140,5 +141,22 @@ describe('registration and email verification (FR3)', () => {
     await mailsTo(email);
     const again = await client.auth.resend({ type: 'signup', email, options: { emailRedirectTo: redirect } });
     expect(again.error?.code).toMatch(/^over_/);
+  });
+
+  it('brings the listing a guest came from back through the verification link (FR2)', async () => {
+    const listing = `/listing/${randomUUID()}`;
+    for (const callback of ['http://localhost:8081/auth/callback', 'tinir://auth/callback']) {
+      const client = browser();
+      const email = address('return');
+      created.add(email);
+      const { error } = await client.auth.signUp({
+        email, password: password(), options: { data: { role: 'student', full_name: 'Fictional Student' }, emailRedirectTo: verificationRedirect(callback, listing) },
+      });
+      expect(error).toBeNull();
+      const target = await follow(verifyLink((await mailsTo(email))[0]));
+      expect(`${target.protocol}//${target.host}${target.pathname}`).toBe(callback);
+      expect(target.searchParams.get('next')).toBe(listing);
+      expect(target.searchParams.get('code')).toBeTruthy();
+    }
   });
 });

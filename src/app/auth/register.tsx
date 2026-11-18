@@ -15,7 +15,7 @@ import { returnPath, withReturnPath } from '@/services/return-path';
 const empty: RegistrationForm = { role: null, full_name: '', email: '', password: '', contact_number: '', college_program: '' };
 
 export default function RegisterScreen() {
-  // Kept so that logging in after verification can return to the listing the guest came from (FR2).
+  // Kept so that verifying the email, or logging in afterwards, returns to the listing the guest came from (FR2).
   const next = returnPath(useLocalSearchParams<{ next?: string }>().next);
   const back = next ? { href: next, label: 'Back to the listing' } : undefined;
   const [form, setForm] = useState(empty);
@@ -40,7 +40,7 @@ export default function RegisterScreen() {
     }
     setBusy(true);
     try {
-      const { delivery } = await register(form);
+      const { delivery } = await register(form, next);
       setRegistered({ email: checked.value.email, delivery });
       // Drop the password from memory once the account request is sent.
       setForm(empty);

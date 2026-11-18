@@ -13,7 +13,7 @@ import { withReturnPath } from '@/services/return-path';
  * means Auth throttled email, so the panel makes no claim that a link was sent (NFR12).
  */
 export function CheckEmail({ email, delivery = 'sent', next = null }: { email: string; delivery?: SignupDelivery; next?: Href | null }) {
-  const { resend, busy, remaining, result } = useResendVerification(true);
+  const { resend, busy, remaining, result } = useResendVerification(true, next);
   return (
     <View style={styles.panel}>
       {delivery === 'sent' ? (

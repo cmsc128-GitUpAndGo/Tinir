@@ -85,7 +85,7 @@ Indexes cover listing discovery/owner queries and student/listing inquiry histor
 
 ### 4.1 Authentication
 
-Use Supabase Auth SDK operations for signup, password login, resend, PKCE code exchange, session retrieval, and logout. Verification redirects to `tinir://auth/callback` on native or `/auth/callback` on web. The callback is the only added feature route in this backend task; account forms and protected feature navigation remain their story issues.
+Use Supabase Auth SDK operations for signup, password login, resend, PKCE code exchange, session retrieval, and logout. Verification redirects to `tinir://auth/callback` on native or `/auth/callback` on web. When signup starts from a listing, the redirect carries the validated listing path as `next` so the callback can link back to it; the Auth redirect allow list therefore includes each callback with a `?**` query pattern. The callback is the only added feature route in this backend task; account forms and protected feature navigation remain their story issues.
 
 Email confirmation is enabled locally. Unconfirmed password login is rejected by Auth. Backend role actions also check the authoritative confirmation state, so possession of an old token cannot bypass verification. Owner contacts remain a login-only rule, separate from the verified-role requirement.
 

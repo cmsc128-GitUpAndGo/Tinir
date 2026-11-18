@@ -72,7 +72,8 @@ describe('listing search (FR12)', () => {
   it('filters by type, price range, and amenities, alone and together', async () => {
     expect((await search({ type: 'room' })).titles).toEqual([`Room C ${token}`, `Room D ${token}`]);
     expect((await search({ min_price: 200000, max_price: 400000 })).titles).toEqual([`Room C ${token}`, `Room D ${token}`]);
-    expect((await search({ amenities: ['Wi-Fi', 'Kitchen'] })).titles).toEqual([`Room C ${token}`]);
+    // Bedspace B hides its price, but no price range is set, so it still matches.
+    expect((await search({ amenities: ['Wi-Fi', 'Kitchen'] })).titles).toEqual([`Bedspace B ${token}`, `Room C ${token}`]);
     expect((await search({ type: 'room', max_price: 310000, amenities: ['Wi-Fi'] })).titles).toEqual([`Room C ${token}`]);
   });
 

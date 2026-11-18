@@ -1,21 +1,25 @@
 import { z } from 'zod';
+import type { Href } from 'expo-router';
 import { Platform } from 'react-native';
 import { getSupabase } from '@/lib/supabase/client';
 import { backendError, BackendError } from './errors';
 import { loginError, signOutDevice, validateLogin, type LoginForm } from './login';
 import { REGISTERED_MESSAGE, signupOutcome, validateRegistration, type RegistrationForm } from './registration';
+import { verificationRedirect } from './return-path';
 
 export type { LoginForm } from './login';
 export type { Registration, RegistrationForm } from './registration';
 
-function redirectTo() {
-  return Platform.OS === 'web' && typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : 'tinir://auth/callback';
+function redirectTo(next: Href | null = null) {
+  const callback = Platform.OS === 'web' && typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : 'tinir://auth/callback';
+  return verificationRedirect(callback, next);
 }
-export async function register(input: RegistrationForm) {
+/** `next` is the listing the guest came from; verification links bring them back to it (FR2). */
+export async function register(input: RegistrationForm, next: Href | null = null) {
   const checked = validateRegistration(input);
   if (!checked.ok) throw new BackendError('INVALID_INPUT', 'Check the highlighted fields.', checked.fields);
   const { email, password, ...data } = checked.value;
-  const { error } = await getSupabase().auth.signUp({ email, password, options: { data, emailRedirectTo: redirectTo() } });
+  const { error } = await getSupabase().auth.signUp({ email, password, options: { data, emailRedirectTo: redirectTo(next) } });
   const outcome = signupOutcome(error);
   if (!outcome.ok) throw outcome.error;
   // Duplicate addresses get the same result, so the form never discloses whether an account exists.
@@ -36,10 +40,10 @@ export async function login(input: LoginForm) {
 export async function logout() {
   return signOutDevice(getSupabase().auth);
 }
-export async function resendVerification(email: string) {
+export async function resendVerification(email: string, next: Href | null = null) {
   email = email.trim().toLowerCase();
   if (!z.email().safeParse(email).success) throw new BackendError('INVALID_INPUT', 'Enter a valid email address.');
-  const { error } = await getSupabase().auth.resend({ type: 'signup', email, options: { emailRedirectTo: redirectTo() } });
+  const { error } = await getSupabase().auth.resend({ type: 'signup', email, options: { emailRedirectTo: redirectTo(next) } });
   if (error && error.code?.startsWith('over_')) throw backendError(error);
   return { message: 'If verification is needed, check your email.' };
 }

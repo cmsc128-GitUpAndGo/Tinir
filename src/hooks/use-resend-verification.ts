@@ -1,3 +1,4 @@
+import type { Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 
 import { resendVerification } from '@/services/auth';
@@ -6,7 +7,7 @@ import { backendError } from '@/services/errors';
 /** Auth allows one verification email per address per minute; mirror that so the button explains the wait. */
 export const RESEND_COOLDOWN_SECONDS = 60;
 
-export function useResendVerification(startCoolingDown = false) {
+export function useResendVerification(startCoolingDown = false, returnTo: Href | null = null) {
   const [until, setUntil] = useState(() => (startCoolingDown ? Date.now() + RESEND_COOLDOWN_SECONDS * 1000 : 0));
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
@@ -23,7 +24,7 @@ export function useResendVerification(startCoolingDown = false) {
     setBusy(true);
     setResult(null);
     try {
-      const { message } = await resendVerification(email);
+      const { message } = await resendVerification(email, returnTo);
       setResult({ tone: 'success', message });
       const next = Date.now();
       setNow(next);
@@ -33,7 +34,7 @@ export function useResendVerification(startCoolingDown = false) {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [returnTo]);
 
   return { resend, busy, remaining, result };
 }

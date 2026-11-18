@@ -118,7 +118,8 @@ function StudentInquiry({ listingId }: { listingId: string }) {
       {result?.tone === 'success' && <Button variant="secondary" label="View my inquiries" onPress={() => router.navigate('/inquiries')} />}
       {asking ? (
         <View style={styles.panel}>
-          <TextField label="Your question" value={draft} multiline maxLength={QUESTION_MAX} error={fieldError}
+          {/* Read-only while sending, so nothing typed after tapping Send is cleared by the success handler. */}
+          <TextField label="Your question" value={draft} multiline maxLength={QUESTION_MAX} error={fieldError} editable={!sending}
             hint={`Up to ${QUESTION_MAX.toLocaleString('en-PH')} characters.`} placeholder="e.g. Is water included in the rent?"
             onChangeText={(value) => { setDraft(value); setFieldError(undefined); }} />
           <Button label="Send question" busy={sending === 'question'} disabled={Boolean(sending)} onPress={() => void send('question')} />

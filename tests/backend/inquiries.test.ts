@@ -130,6 +130,8 @@ describe('sending an inquiry (FR7)', () => {
     for (const args of [
       { listing_id: listingId, type: 'question' },
       { listing_id: listingId, type: 'question', message: '   ' },
+      { listing_id: listingId, type: 'question', message: '\n\t \r\n\n' },
+      { listing_id: listingId, type: 'question', message: '\u000b\f\n' },
       { listing_id: listingId, type: 'question', message: 'x'.repeat(4001) },
       { listing_id: listingId, type: 'booking', message: 'Reserve it' },
     ]) {

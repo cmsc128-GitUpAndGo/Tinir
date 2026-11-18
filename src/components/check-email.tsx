@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { Button, Notice } from '@/components/form';
@@ -6,12 +6,13 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useResendVerification } from '@/hooks/use-resend-verification';
 import type { SignupDelivery } from '@/services/registration';
+import { withReturnPath } from '@/services/return-path';
 
 /**
  * Pending-verification panel shown after signup (FR3). The address is only kept in memory. `unconfirmed`
  * means Auth throttled email, so the panel makes no claim that a link was sent (NFR12).
  */
-export function CheckEmail({ email, delivery = 'sent' }: { email: string; delivery?: SignupDelivery }) {
+export function CheckEmail({ email, delivery = 'sent', next = null }: { email: string; delivery?: SignupDelivery; next?: Href | null }) {
   const { resend, busy, remaining, result } = useResendVerification(true);
   return (
     <View style={styles.panel}>
@@ -43,7 +44,7 @@ export function CheckEmail({ email, delivery = 'sent' }: { email: string; delive
         disabled={remaining > 0}
         onPress={() => resend(email)}
       />
-      <Button variant="secondary" label="Go to log in" onPress={() => router.replace('/auth/login')} />
+      <Button variant="secondary" label="Go to log in" onPress={() => router.replace(withReturnPath('/auth/login', next))} />
     </View>
   );
 }

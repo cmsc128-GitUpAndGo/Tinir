@@ -1,4 +1,4 @@
-import { Link } from 'expo-router';
+import { Link, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -10,10 +10,14 @@ import { Spacing } from '@/constants/theme';
 import { register, type RegistrationForm } from '@/services/auth';
 import { backendError } from '@/services/errors';
 import { validateRegistration, type FieldErrors, type SignupDelivery } from '@/services/registration';
+import { returnPath, withReturnPath } from '@/services/return-path';
 
 const empty: RegistrationForm = { role: null, full_name: '', email: '', password: '', contact_number: '', college_program: '' };
 
 export default function RegisterScreen() {
+  // Kept so that logging in after verification can return to the listing the guest came from (FR2).
+  const next = returnPath(useLocalSearchParams<{ next?: string }>().next);
+  const back = next ? { href: next, label: 'Back to the listing' } : undefined;
   const [form, setForm] = useState(empty);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -51,15 +55,16 @@ export default function RegisterScreen() {
 
   if (registered) {
     return (
-      <AuthScreen title="Verify your email">
-        <CheckEmail email={registered.email} delivery={registered.delivery} />
+      <AuthScreen title="Verify your email" back={back}>
+        <CheckEmail email={registered.email} delivery={registered.delivery} next={next} />
       </AuthScreen>
     );
   }
 
   const owner = form.role === 'owner';
   return (
-    <AuthScreen title="Create an account" intro="Browse freely. An account lets students send inquiries and owners post listings.">
+    <AuthScreen title="Create an account" intro="Browse freely. An account lets students send inquiries and owners post listings."
+      back={back}>
       <View style={styles.group} accessibilityRole="radiogroup" accessibilityLabel="Account type">
         <ThemedText type="smallBold">I am a…</ThemedText>
         <Choice label="Student" description="Find a place and contact owners." selected={form.role === 'student'} onPress={() => set('role', 'student')} />
@@ -93,7 +98,7 @@ export default function RegisterScreen() {
       <Button label="Create account" onPress={submit} busy={busy} />
       <ThemedText type="small" themeColor="textSecondary">
         Already have an account?{' '}
-        <Link href="/auth/login" replace><ThemedText type="linkPrimary">Log in</ThemedText></Link>
+        <Link href={withReturnPath('/auth/login', next)} replace><ThemedText type="linkPrimary">Log in</ThemedText></Link>
       </ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
         Didn’t get a verification email?{' '}

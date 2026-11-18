@@ -1,4 +1,4 @@
-import { Link, Redirect, router } from 'expo-router';
+import { Link, Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -11,11 +11,15 @@ import { useSession } from '@/lib/supabase/session-provider';
 import { login, type LoginForm } from '@/services/auth';
 import { backendError } from '@/services/errors';
 import { validateLogin, type LoginFields } from '@/services/login';
+import { returnPath, withReturnPath } from '@/services/return-path';
 
 const empty: LoginForm = { email: '', password: '' };
 
 export default function LoginScreen() {
   const { session, loading } = useSession();
+  // A guest sent here from a listing (FR2) returns to that listing; nothing is sent on their behalf.
+  const next = returnPath(useLocalSearchParams<{ next?: string }>().next);
+  const destination = next ?? '/account';
   const [form, setForm] = useState(empty);
   const [errors, setErrors] = useState<LoginFields>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -38,7 +42,7 @@ export default function LoginScreen() {
       await login(form);
       // Drop the password from memory once the session exists.
       setForm(empty);
-      router.replace('/account');
+      router.replace(destination);
     } catch (error) {
       const failure = backendError(error).error;
       setErrors(failure.fields ?? {});
@@ -49,11 +53,12 @@ export default function LoginScreen() {
     }
   };
 
-  // Someone already logged in (for example after a verification link) goes straight to their account.
-  if (!loading && session) return <Redirect href="/account" />;
+  // Someone already logged in (for example after a verification link) goes straight on.
+  if (!loading && session) return <Redirect href={destination} />;
 
   return (
-    <AuthScreen title="Log in" intro="Welcome back. Log in to send inquiries, save listings, or manage your listings.">
+    <AuthScreen title="Log in" intro="Welcome back. Log in to send inquiries, save listings, or manage your listings."
+      back={next ? { href: next, label: 'Back to the listing' } : undefined}>
       <View style={styles.group}>
         <TextField label="Email" value={form.email} onChangeText={(v) => set('email', v)} error={errors.email}
           autoComplete="email" textContentType="username" keyboardType="email-address" autoCapitalize="none" autoCorrect={false}
@@ -74,7 +79,7 @@ export default function LoginScreen() {
       <Button label="Log in" onPress={submit} busy={busy} />
       <ThemedText type="small" themeColor="textSecondary">
         New to Tinir?{' '}
-        <Link href="/auth/register" replace><ThemedText type="linkPrimary">Create an account</ThemedText></Link>
+        <Link href={withReturnPath('/auth/register', next)} replace><ThemedText type="linkPrimary">Create an account</ThemedText></Link>
       </ThemedText>
     </AuthScreen>
   );

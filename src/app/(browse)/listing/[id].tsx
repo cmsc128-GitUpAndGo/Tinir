@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ExternalLink } from '@/components/external-link';
 import { Button, Notice } from '@/components/form';
+import { InquiryActions } from '@/components/inquiry-actions';
 import { PhotoGallery } from '@/components/photo-gallery';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -95,6 +96,8 @@ function ListingBody({ listing }: { listing: ListingDetail }) {
           <ThemedText type="smallBold" style={styles.badgeText}>{availabilityLabel(listing)}</ThemedText>
         </View>
       </View>
+
+      <InquiryActions listingId={listing.id} />
 
       <Section title="Location">
         <ThemedText selectable>{listing.address}</ThemedText>

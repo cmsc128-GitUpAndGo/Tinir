@@ -86,7 +86,7 @@ describe('listing details (FR6)', () => {
     expect(data).toMatchObject({
       id: ids.hidden, title: 'Detail hidden price', property_type: 'room', address: '12 Synthetic St', area: 'Synthetic area',
       description: 'Synthetic description', house_rules: 'No pets', available_slots: 2, availability_status: 'available',
-      price_visible: false, price_period: 'monthly', amenities: ['Kitchen', 'Wi-Fi'],
+      price_visible: false, amenities: ['Kitchen', 'Wi-Fi'],
     });
     expect(data?.updated_at).toBeTruthy();
     expect(data?.last_confirmed_at).toBeTruthy();
@@ -95,13 +95,21 @@ describe('listing details (FR6)', () => {
     expect(JSON.stringify(data)).not.toContain('.webp');
   });
 
-  it('includes a disclosed price for everyone and omits a hidden one for every non-owner view', async () => {
+  it('includes a disclosed price and period for everyone and omits both when hidden in every public view', async () => {
     expect((await detail(guest, ids.visible)).data).toMatchObject({ price_visible: true, price_amount: 650000, price_period: 'semester' });
     for (const viewer of [guest, student.client, otherOwner.client, owner.client]) {
       const { data } = await detail(viewer, ids.hidden);
       expect(data).not.toHaveProperty('price_amount');
+      expect(data).not.toHaveProperty('price_period');
       expect(JSON.stringify(data)).not.toContain('410000');
     }
+  });
+
+  it('keeps a hidden price and its period in the owner management view', async () => {
+    const { data, error } = await owner.client.rpc('tinir_read', { operation: 'owner_listings', args: {} });
+    expect(error).toBeNull();
+    expect((data as { items: Record<string, unknown>[] }).items.find((l) => l.id === ids.hidden))
+      .toMatchObject({ price_visible: false, price_amount: 410000, price_period: 'monthly' });
   });
 
   it('omits owner contacts for guests and shows them to logged-in users (NFR8)', async () => {

@@ -1,5 +1,5 @@
 import { router, Stack, useLocalSearchParams, type Href } from 'expo-router';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -154,9 +154,9 @@ function OwnerContact({ listing }: { listing: ListingDetail }) {
       <Section title="Contact the owner">
         <ThemedText selectable style={styles.ownerName}>{contact.full_name}</ThemedText>
         {phone ? (
-          <ContactLink label={phone} hint="Calls the owner" url={`tel:${phone.replace(/[\s-]/g, '')}`} />
+          <ContactLink label={phone} hint="Calls the owner" detail="number" url={`tel:${phone.replace(/[\s-]/g, '')}`} />
         ) : null}
-        <ContactLink label={contact.email} hint="Writes an email to the owner" url={`mailto:${contact.email}`} />
+        <ContactLink label={contact.email} hint="Writes an email to the owner" detail="email address" url={`mailto:${contact.email}`} />
       </Section>
     );
   }
@@ -175,12 +175,23 @@ function OwnerContact({ listing }: { listing: ListingDetail }) {
   );
 }
 
-function ContactLink({ label, hint, url }: { label: string; hint: string; url: string }) {
+/** NFR12: when no app can handle the link (e.g. no email app), say so and point to the copyable text. */
+function ContactLink({ label, hint, detail, url }: { label: string; hint: string; detail: string; url: string }) {
+  const [failed, setFailed] = useState(false);
+  const open = () => {
+    setFailed(false);
+    Linking.openURL(url).catch(() => setFailed(true));
+  };
   return (
-    <Pressable accessibilityRole="link" accessibilityHint={hint} onPress={() => void Linking.openURL(url).catch(() => {})}
-      style={({ pressed }) => [styles.contact, pressed && styles.pressed]}>
-      <ThemedText type="linkPrimary" selectable>{label}</ThemedText>
-    </Pressable>
+    <>
+      <Pressable accessibilityRole="link" accessibilityHint={hint} onPress={open}
+        style={({ pressed }) => [styles.contact, pressed && styles.pressed]}>
+        <ThemedText type="linkPrimary" selectable>{label}</ThemedText>
+      </Pressable>
+      {failed ? (
+        <Notice tone="error">{`Couldn’t open an app for this. Copy the ${detail} above to contact the owner.`}</Notice>
+      ) : null}
+    </>
   );
 }
 

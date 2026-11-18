@@ -7,7 +7,7 @@ export interface ListingFilters extends PageRequest { type?: PropertyType; min_p
 export interface Photo { id: string; sort_order: number }
 export interface Listing {
   id: string; title: string; property_type: PropertyType; area: string; price_visible: boolean;
-  price_amount?: number | null; price_period: 'monthly' | 'semester'; availability_status: 'available' | 'full';
+  price_amount?: number | null; price_period?: 'monthly' | 'semester'; availability_status: 'available' | 'full';
   photos: Photo[]; amenities: string[]; created_at: string; updated_at: string;
 }
 export interface ListingDetail extends Listing {

@@ -204,7 +204,7 @@ Source NFR1–NFR12 are canonical in REQUIREMENTS.md. Additional usability/acces
 - Property owners are willing to create accounts and keep listings up to date.
 - The project is built by a 5-person student team within an academic term, so scope must stay limited.
 - The initial release has no budget for paid third-party services beyond free tiers.
-- **Target platforms (decided 2026-11-07):** One Expo codebase supports Android, iOS and web. The official deliverables are the **Android app** (shared as an APK built with EAS) and the **web app**. iOS users use the web app in Safari, optionally added to the Home Screen as a shortcut. No App Store release is planned, because it requires a paid Apple Developer account. iOS native builds remain possible later without code changes.
+- **Target platforms (decided 2026-11-07):** The supported platforms are **Android** (an APK built with EAS) and the **web app**. iOS is not supported: the team cannot build or test on iOS, so there is no App Store release and no iOS-specific testing.
 
 ## 11. Open Questions
 

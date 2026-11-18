@@ -2,7 +2,7 @@ import { useCallback, useEffect, useReducer, useRef } from 'react';
 
 import { isBackendConfigured } from '@/lib/supabase/client';
 import { listings } from '@/services/backend';
-import type { Page, PageRequest } from '@/services/contracts';
+import type { ListingFilters, Page, PageRequest } from '@/services/contracts';
 import { backendError } from '@/services/errors';
 import {
   FEED_PAGE_SIZE,
@@ -63,5 +63,15 @@ export function usePagedFeed<T extends { id: string }>(fetchPage: (page: PageReq
   };
 }
 
-/** Paged public listings (FR1). The server returns only published listings and guest-safe fields. */
-export const useListingFeed = () => usePagedFeed(listings.list);
+/**
+ * Paged public listings matching `filters` (FR1, FR12). The server returns only published listings and
+ * guest-safe fields. New filters start again from page 1, and later pages keep the same filters.
+ */
+export function useListingFeed(filters: ListingFilters = {}) {
+  const key = JSON.stringify(filters);
+  const fetchPage = useCallback(
+    (page: PageRequest) => listings.list({ ...(JSON.parse(key) as ListingFilters), ...page }),
+    [key],
+  );
+  return usePagedFeed(fetchPage);
+}

@@ -66,11 +66,11 @@ export function SearchPanel({ form, errors, priceRangeActive, onChange, onClear 
             <View style={styles.prices}>
               <View style={styles.price}>
                 <TextField label="Minimum" value={form.minPrice} onChangeText={(minPrice) => onChange({ minPrice })}
-                  error={errors.minPrice} placeholder="0" keyboardType="number-pad" inputMode="numeric" maxLength={9} />
+                  error={errors.minPrice} placeholder="0" keyboardType="decimal-pad" inputMode="decimal" maxLength={12} />
               </View>
               <View style={styles.price}>
                 <TextField label="Maximum" value={form.maxPrice} onChangeText={(maxPrice) => onChange({ maxPrice })}
-                  error={errors.maxPrice} placeholder="Any" keyboardType="number-pad" inputMode="numeric" maxLength={9} />
+                  error={errors.maxPrice} placeholder="Any" keyboardType="decimal-pad" inputMode="decimal" maxLength={12} />
               </View>
             </View>
             <ThemedText type="small" themeColor="textSecondary">Compares the listed amount, per month or per semester.</ThemedText>

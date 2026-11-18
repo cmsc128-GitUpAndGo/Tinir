@@ -37,7 +37,7 @@ export function formatDate(iso: string | null | undefined): string {
 }
 
 /** A map search for the listing's published coordinates, or null when the listing has none. */
-export function mapUrl(listing: Pick<ListingDetail, 'latitude' | 'longitude'>): string | null {
+export function mapUrl(listing: Pick<ListingDetail, 'latitude' | 'longitude'>): `https://${string}` | null {
   const { latitude, longitude } = listing;
   if (latitude === null || longitude === null) return null;
   const lat = Number(latitude);

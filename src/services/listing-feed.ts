@@ -26,6 +26,8 @@ export type FeedAction<T extends { id: string } = Listing> =
 export function feedReducer<T extends { id: string }>(state: FeedState<T>, action: FeedAction<T>): FeedState<T> {
   switch (action.type) {
     case 'start':
+      // A fresh load (first load, or new search filters) never shows the previous query's records.
+      if (action.mode === 'loading') return { ...(initialFeed as FeedState<T>), status: 'loading' };
       return { ...state, status: action.mode, error: null, failed: null };
     case 'page': {
       const { items, page, page_size } = action.page;

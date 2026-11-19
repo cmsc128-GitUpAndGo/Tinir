@@ -43,6 +43,16 @@ describe('listing feed pagination (FR1)', () => {
     expect(nextPage(state, 'loading-more')).toBe(2);
   });
 
+  it('drops the previous query’s records when a new search starts loading (FR12)', () => {
+    let state = feedReducer(initialFeed, { type: 'page', page: { items: [listing('a'), listing('b')], page: 1, page_size: 2 } });
+    state = feedReducer(state, { type: 'page', page: { items: [listing('c'), listing('d')], page: 2, page_size: 2 } });
+    state = feedReducer(state, { type: 'start', mode: 'loading' });
+    expect(ids(state)).toEqual([]);
+    expect(state.page).toBe(0);
+    expect(state.hasMore).toBe(true);
+    expect(nextPage(state, 'loading')).toBe(1);
+  });
+
   describe('retry repeats the failed request', () => {
     const full = () => feedReducer(initialFeed, { type: 'page', page: { items: [listing('a'), listing('b')], page: 1, page_size: 2 } });
     const failRefresh = (state: FeedState) =>

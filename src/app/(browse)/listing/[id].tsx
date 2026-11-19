@@ -1,10 +1,11 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams, type Href } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ExternalLink } from '@/components/external-link';
 import { Button, Notice } from '@/components/form';
+import { InquiryActions } from '@/components/inquiry-actions';
 import { PhotoGallery } from '@/components/photo-gallery';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -13,6 +14,7 @@ import { useListingDetail } from '@/hooks/use-listing-detail';
 import { useSession } from '@/lib/supabase/session-provider';
 import type { ListingDetail } from '@/services/contracts';
 import { availabilityLabel, formatDate, mapUrl, priceLabel, propertyTypeLabel } from '@/services/listing-format';
+import { withReturnPath } from '@/services/return-path';
 
 /**
  * Listing details (FR6). Guests see everything public; logged-in users also get the owner's contact details.
@@ -96,6 +98,8 @@ function ListingBody({ listing }: { listing: ListingDetail }) {
         </View>
       </View>
 
+      <InquiryActions listingId={listing.id} />
+
       <Section title="Location">
         <ThemedText selectable>{listing.address}</ThemedText>
         {map ? (
@@ -163,8 +167,8 @@ function OwnerContact({ listing }: { listing: ListingDetail }) {
       ) : (
         <>
           <ThemedText themeColor="textSecondary">Log in or create an account to see the owner’s contact details.</ThemedText>
-          <Button label="Log in" onPress={() => router.push('/auth/login')} />
-          <Button variant="secondary" label="Create an account" onPress={() => router.push('/auth/register')} />
+          <Button label="Log in" onPress={() => router.push(withReturnPath('/auth/login', `/listing/${listing.id}` as Href))} />
+          <Button variant="secondary" label="Create an account" onPress={() => router.push(withReturnPath('/auth/register', `/listing/${listing.id}` as Href))} />
         </>
       )}
     </Section>

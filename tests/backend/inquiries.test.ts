@@ -1,0 +1,102 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { localStatus } from '../../scripts/backend/local-status.mjs';
+
+// Inquiry requests made directly against the database gateway, bypassing every client check (FR2, FR7, FR8).
+// Accounts and listings are synthetic and removed afterwards.
+const status = localStatus();
+const url: string = status.API_URL;
+const key: string = status.PUBLISHABLE_KEY ?? status.ANON_KEY;
+const admin = createClient(url, status.SERVICE_ROLE_KEY ?? status.SECRET_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+const users: string[] = [];
+
+function sql(query: string) {
+  return execFileSync('docker', ['exec', '-i', 'supabase_db_tinir', 'psql', '-U', 'postgres', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1', '-At'],
+    { input: query, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+}
+function client(): SupabaseClient {
+  const memory = new Map<string, string>();
+  return createClient(url, key, {
+    auth: {
+      persistSession: true, autoRefreshToken: false, detectSessionInUrl: false,
+      storage: { getItem: (k) => memory.get(k) ?? null, setItem: (k, v) => { memory.set(k, v); }, removeItem: (k) => { memory.delete(k); } },
+    },
+  });
+}
+async function member(role: 'student' | 'owner') {
+  const email = `tinir-inquiry-${role}-${randomUUID()}@example.test`;
+  const password = `Pw1-${randomUUID()}`;
+  const { data, error } = await admin.auth.admin.createUser({
+    email, password, email_confirm: true, user_metadata: { role, full_name: `Fictional ${role}`, contact_number: '0917 000 0000' },
+  });
+  if (error) throw error;
+  users.push(data.user.id);
+  const c = client();
+  const login = await c.auth.signInWithPassword({ email, password });
+  if (login.error) throw login.error;
+  return { id: data.user.id, client: c };
+}
+type Result = { code: string; data?: unknown };
+async function call(c: SupabaseClient, method: 'tinir_read' | 'tinir_write', operation: string, args: object = {}): Promise<Result> {
+  const { data, error } = await c.rpc(method, { operation, args });
+  if (error) {
+    try { return { code: (JSON.parse(error.message) as { code: string }).code }; }
+    catch { return { code: error.code === '42501' ? 'NO_EXECUTE' : `DB_${error.code}` }; }
+  }
+  const failure = (data as { error?: { code: string } } | null)?.error;
+  return failure ? { code: failure.code } : { code: 'OK', data };
+}
+const inquiriesOf = (studentId: string) => Number(sql(`SELECT count(*) FROM app_private.inquiries WHERE student_id='${studentId}'`));
+
+let guest: SupabaseClient;
+let owner: Awaited<ReturnType<typeof member>>;
+const listingId = randomUUID();
+
+beforeAll(async () => {
+  guest = client();
+  owner = await member('owner');
+  sql(`INSERT INTO app_private.listings(id,owner_id,title,property_type,address,latitude,longitude,status) VALUES
+    ('${listingId}','${owner.id}','Inquiry fixture','room','Synthetic address',10.7,122.5,'published')`);
+}, 60000);
+afterAll(async () => {
+  const list = users.map((id) => `'${id}'`).join(',');
+  if (list) sql(`DELETE FROM app_private.inquiries WHERE student_id IN (${list}) OR listing_id IN (SELECT id FROM app_private.listings WHERE owner_id IN (${list}));
+    DELETE FROM app_private.request_limits WHERE actor_id IN (${list});
+    DELETE FROM app_private.listings WHERE owner_id IN (${list});`);
+  for (const id of users) await admin.auth.admin.deleteUser(id);
+}, 30000);
+
+describe('who may send an inquiry (FR2)', () => {
+  it('rejects both entry points from a guest before any inquiry exists', async () => {
+    const before = Number(sql(`SELECT count(*) FROM app_private.inquiries WHERE listing_id='${listingId}'`));
+    expect((await call(guest, 'tinir_write', 'send_inquiry', { listing_id: listingId, type: 'interest' })).code).toBe('NO_EXECUTE');
+    expect((await call(guest, 'tinir_write', 'send_inquiry', { listing_id: listingId, type: 'question', message: 'Is water included?' })).code).toBe('NO_EXECUTE');
+    expect(Number(sql(`SELECT count(*) FROM app_private.inquiries WHERE listing_id='${listingId}'`))).toBe(before);
+  });
+
+  it('tells an unverified student to verify, for both entry points', async () => {
+    const pending = await member('student');
+    sql(`UPDATE auth.users SET email_confirmed_at=NULL WHERE id='${pending.id}'`);
+    expect((await call(pending.client, 'tinir_write', 'send_inquiry', { listing_id: listingId, type: 'interest' })).code).toBe('EMAIL_UNVERIFIED');
+    expect((await call(pending.client, 'tinir_write', 'send_inquiry', { listing_id: listingId, type: 'question', message: 'Hello?' })).code).toBe('EMAIL_UNVERIFIED');
+    expect(inquiriesOf(pending.id)).toBe(0);
+  });
+
+  it('refuses owners, including on their own listing', async () => {
+    expect((await call(owner.client, 'tinir_write', 'send_inquiry', { listing_id: listingId, type: 'interest' })).code).toBe('FORBIDDEN');
+    expect(Number(sql(`SELECT count(*) FROM app_private.inquiries WHERE listing_id='${listingId}'`))).toBe(0);
+  });
+
+  it('rejects a logged-out token that has not expired yet', async () => {
+    const leaving = await member('student');
+    const token = (await leaving.client.auth.getSession()).data.session!.access_token;
+    await leaving.client.auth.signOut();
+    const replay = createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+    expect((await call(replay, 'tinir_write', 'send_inquiry', { listing_id: listingId, type: 'interest' })).code).toBe('UNAUTHENTICATED');
+    expect(inquiriesOf(leaving.id)).toBe(0);
+  });
+});

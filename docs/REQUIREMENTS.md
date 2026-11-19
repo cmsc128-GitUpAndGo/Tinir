@@ -117,7 +117,7 @@ Acceptance criteria: Verify a scheduled daily backup exists on the chosen plan a
 
 ### NFR10: The system works on the latest versions of Chrome, Safari, Firefox, and Edge.
 
-Acceptance criteria: Record the tested browser versions and validate core flows, including Safari on iOS; the proposed engineering target is the latest two versions.
+Acceptance criteria: Record the tested browser versions and validate core flows on desktop and Android browsers (iOS is not supported); the proposed engineering target is the latest two versions.
 
 ### NFR11: The system uses consistent navigation, readable text, clearly labeled controls, and understandable error messages across guest, student, and property-owner screens.
 

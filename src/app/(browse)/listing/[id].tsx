@@ -65,7 +65,7 @@ function DetailLayout({ title, children }: { title: string; children: ReactNode 
   return (
     <ThemedView style={styles.screen}>
       <Stack.Screen options={{ title }} />
-      <ScrollView contentContainerStyle={[styles.content, {
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, {
         paddingTop: Platform.OS === 'web' ? Spacing.six + Spacing.three : insets.top + Spacing.two,
         paddingBottom: insets.bottom + BottomTabInset + Spacing.four,
       }]}>

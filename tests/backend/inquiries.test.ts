@@ -100,3 +100,63 @@ describe('who may send an inquiry (FR2)', () => {
     expect(inquiriesOf(leaving.id)).toBe(0);
   });
 });
+
+describe('sending an inquiry (FR7)', () => {
+  it('records a question as Pending for the listing and student, visible only to the owning owner', async () => {
+    const student = await member('student');
+    const otherOwner = await member('owner');
+    const sent = await call(student.client, 'tinir_write', 'send_inquiry', { listing_id: listingId, type: 'question', message: 'Is water included?' });
+    expect(sent.code).toBe('OK');
+    const id = (sent.data as { id: string }).id;
+    expect(sql(`SELECT listing_id||'|'||student_id||'|'||type||'|'||status FROM app_private.inquiries WHERE id='${id}'`))
+      .toBe(`${listingId}|${student.id}|question|pending`);
+
+    const received = await call(owner.client, 'tinir_read', 'owner_inquiries');
+    expect((received.data as { items: { id: string; message: string }[] }).items).toContainEqual(expect.objectContaining({ id, message: 'Is water included?' }));
+    expect((await call(otherOwner.client, 'tinir_read', 'owner_inquiries')).data).toMatchObject({ items: [] });
+  });
+
+  it('keeps one Pending interest per student and listing however often it is sent', async () => {
+    const student = await member('student');
+    const sends = await Promise.all(Array.from({ length: 3 }, () =>
+      call(student.client, 'tinir_write', 'send_inquiry', { listing_id: listingId, type: 'interest' })));
+    expect(sends.every((s) => s.code === 'OK')).toBe(true);
+    expect(new Set(sends.map((s) => (s.data as { id: string }).id)).size).toBe(1);
+    expect(inquiriesOf(student.id)).toBe(1);
+  });
+
+  it('rejects empty and oversized questions and unknown inquiry types without recording them', async () => {
+    const student = await member('student');
+    for (const args of [
+      { listing_id: listingId, type: 'question' },
+      { listing_id: listingId, type: 'question', message: '   ' },
+      { listing_id: listingId, type: 'question', message: '\n\t \r\n\n' },
+      { listing_id: listingId, type: 'question', message: '\u000b\f\n' },
+      { listing_id: listingId, type: 'question', message: 'x'.repeat(4001) },
+      { listing_id: listingId, type: 'booking', message: 'Reserve it' },
+    ]) {
+      expect((await call(student.client, 'tinir_write', 'send_inquiry', args)).code, JSON.stringify(args).slice(0, 60)).toBe('INVALID_INPUT');
+    }
+    expect(inquiriesOf(student.id)).toBe(0);
+  });
+
+  it('rejects inquiries on drafts, archived, and unknown listings', async () => {
+    const student = await member('student');
+    const [draft, archived] = [randomUUID(), randomUUID()];
+    sql(`INSERT INTO app_private.listings(id,owner_id,title,property_type,address,latitude,longitude,status) VALUES
+      ('${draft}','${owner.id}','Inquiry draft','room','Synthetic address',10.7,122.5,'draft'),
+      ('${archived}','${owner.id}','Inquiry archived','room','Synthetic address',10.7,122.5,'archived')`);
+    for (const id of [draft, archived, randomUUID()]) {
+      expect((await call(student.client, 'tinir_write', 'send_inquiry', { listing_id: id, type: 'interest' })).code).toBe('NOT_FOUND');
+    }
+    expect(inquiriesOf(student.id)).toBe(0);
+  });
+
+  it('cannot be sent in another student’s name', async () => {
+    const student = await member('student');
+    const victim = await member('student');
+    const forged = await call(student.client, 'tinir_write', 'send_inquiry', { listing_id: listingId, type: 'interest', student_id: victim.id });
+    expect(forged.code).toBe('INVALID_INPUT');
+    expect(inquiriesOf(victim.id)).toBe(0);
+  });
+});

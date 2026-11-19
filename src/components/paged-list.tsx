@@ -2,11 +2,13 @@ import type { ReactElement, ReactNode } from 'react';
 import { ActivityIndicator, FlatList, Platform, Pressable, RefreshControl, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Notice } from '@/components/form';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import type { usePagedFeed } from '@/hooks/use-listing-feed';
 import { useTheme } from '@/hooks/use-theme';
+import { feedFailure } from '@/services/listing-feed';
 
 const TWO_COLUMN_WIDTH = 720;
 
@@ -32,6 +34,7 @@ export function PagedList<T extends { id: string }>({ feed, header, renderItem, 
   // Fixed widths keep a lone last card the same size as its row neighbours.
   const cardWidth = (Math.min(width, MaxContentWidth) - Spacing.three * (columns + 1)) / columns;
   const firstLoad = feed.items.length === 0;
+  const failure = feedFailure(feed);
 
   return (
     <ThemedView style={styles.screen}>
@@ -50,7 +53,19 @@ export function PagedList<T extends { id: string }>({ feed, header, renderItem, 
             paddingBottom: insets.bottom + BottomTabInset + Spacing.four,
           },
         ]}
-        ListHeaderComponent={<View style={styles.header}>{header}</View>}
+        ListHeaderComponent={
+          <View style={styles.header}>
+            {header}
+            {failure === 'refresh' && (
+              // A failed refresh leaves older records on screen; say so next to the header's refresh control.
+              <Notice tone="error">
+                <ThemedText type="smallBold">Couldn’t refresh {noun}</ThemedText>
+                <ThemedText type="small">{feed.error} What’s shown below may be out of date.</ThemedText>
+                <ListButton label="Try again" onPress={feed.retry} />
+              </Notice>
+            )}
+          </View>
+        }
         ListEmptyComponent={
           firstLoad ? (
             <ListMessage
@@ -65,7 +80,7 @@ export function PagedList<T extends { id: string }>({ feed, header, renderItem, 
           firstLoad ? undefined : (
             <View style={styles.footer} accessibilityLiveRegion="polite">
               {feed.status === 'loading-more' && <ActivityIndicator accessibilityLabel={`Loading more ${noun}`} />}
-              {feed.status === 'error' && (
+              {failure === 'more' && (
                 <ListMessage title={`Couldn’t load more ${noun}`} body={feed.error} action={{ label: 'Try again', onPress: feed.retry }} />
               )}
               {feed.status === 'ready' && feed.hasMore && <ListButton label="Load more" onPress={feed.loadMore} />}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Listing } from '../src/services/contracts';
-import { feedReducer, initialFeed, nextPage, retryMode, type FeedState } from '../src/services/listing-feed';
+import { feedFailure, feedReducer, initialFeed, nextPage, retryMode, type FeedState } from '../src/services/listing-feed';
 
 const listing = (id: string): Listing => ({
   id, title: id, property_type: 'room', area: 'Miagao', price_visible: false, price_period: 'monthly',
@@ -53,6 +53,7 @@ describe('listing feed pagination (FR1)', () => {
       expect(ids(state)).toEqual(['a', 'b']);
       expect(retryMode(state)).toBe('refreshing');
       expect(nextPage(state, retryMode(state))).toBe(1);
+      expect(feedFailure(state)).toBe('refresh');
     });
 
     it('reloads page 1 after a failed refresh following the final short page', () => {
@@ -71,12 +72,15 @@ describe('listing feed pagination (FR1)', () => {
       state = feedReducer(state, { type: 'fail', message: 'offline' });
       expect(retryMode(state)).toBe('loading-more');
       expect(nextPage(state, retryMode(state))).toBe(2);
+      expect(feedFailure(state)).toBe('more');
     });
 
     it('repeats the first load when nothing has loaded', () => {
       const state = feedReducer(feedReducer(initialFeed, { type: 'start', mode: 'loading' }), { type: 'fail', message: 'offline' });
       expect(retryMode(state)).toBe('loading');
       expect(nextPage(state, retryMode(state))).toBe(1);
+      expect(feedFailure(state)).toBe('initial');
+      expect(feedFailure(full())).toBeNull();
     });
   });
 });

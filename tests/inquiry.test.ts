@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { QUESTION_MAX, sendFailure, validateQuestion } from '../src/services/inquiry';
+import type { Decision } from '../src/services/contracts';
+import { decisionLabel, QUESTION_MAX, sendFailure, validateQuestion } from '../src/services/inquiry';
+
+describe('inquiry decision badges (FR8)', () => {
+  it('labels each decision and never invents one', () => {
+    expect(decisionLabel('pending')).toBe('Pending');
+    expect(decisionLabel('accepted')).toBe('Accepted');
+    expect(decisionLabel('rejected')).toBe('Rejected');
+    expect(decisionLabel('reserved' as Decision)).toBe('Pending');
+  });
+});
 
 describe('sending an inquiry (FR7, NFR12)', () => {
   it('requires a question with content and trims it', () => {

@@ -1,4 +1,12 @@
+import type { Decision } from './contracts';
 import { backendError } from './errors';
+
+const DECISIONS: Record<Decision, string> = { pending: 'Pending', accepted: 'Accepted', rejected: 'Rejected' };
+
+/** FR8: the badge text for an owner's decision. Unknown values read as Pending rather than as a decision. */
+export function decisionLabel(status: Decision): string {
+  return DECISIONS[status] ?? 'Pending';
+}
 
 /** The server's limit on an inquiry message (app_private.inquiries.message). */
 export const QUESTION_MAX = 4000;

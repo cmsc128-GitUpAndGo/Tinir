@@ -160,3 +160,44 @@ describe('sending an inquiry (FR7)', () => {
     expect(inquiriesOf(victim.id)).toBe(0);
   });
 });
+
+describe('tracking sent inquiries (FR8)', () => {
+  type Sent = { items: { id: string; listing_id: string; listing_title: string; status: string; read_at: string | null }[] };
+  const sentBy = async (c: SupabaseClient, args: object = {}) => (await call(c, 'tinir_read', 'student_inquiries', args)).data as Sent;
+
+  it('lists only the current student\u2019s inquiries, newest first, with listing context', async () => {
+    const student = await member('student');
+    const other = await member('student');
+    const first = await call(student.client, 'tinir_write', 'send_inquiry', { listing_id: listingId, type: 'question', message: 'First' });
+    const second = await call(student.client, 'tinir_write', 'send_inquiry', { listing_id: listingId, type: 'question', message: 'Second' });
+    await call(other.client, 'tinir_write', 'send_inquiry', { listing_id: listingId, type: 'interest' });
+    const { items } = await sentBy(student.client);
+    expect(items.map((i) => i.id)).toEqual([(second.data as { id: string }).id, (first.data as { id: string }).id]);
+    expect(items.every((i) => i.listing_id === listingId && i.listing_title === 'Inquiry fixture' && i.status === 'pending')).toBe(true);
+  });
+
+  it('shows the owner\u2019s stored decision on the next fetch, and reading never decides', async () => {
+    const student = await member('student');
+    const sent = await call(student.client, 'tinir_write', 'send_inquiry', { listing_id: listingId, type: 'interest' });
+    const id = (sent.data as { id: string }).id;
+    expect((await call(owner.client, 'tinir_write', 'update_inquiry', { id, mark_read: true })).code).toBe('OK');
+    expect((await sentBy(student.client)).items[0]).toMatchObject({ id, status: 'pending' });
+    expect((await call(owner.client, 'tinir_write', 'update_inquiry', { id, status: 'accepted' })).code).toBe('OK');
+    expect((await sentBy(student.client)).items[0]).toMatchObject({ id, status: 'accepted' });
+    expect((await call(owner.client, 'tinir_write', 'update_inquiry', { id, status: 'pending' })).code).toBe('OK');
+    expect((await call(owner.client, 'tinir_write', 'update_inquiry', { id, status: 'rejected' })).code).toBe('OK');
+    expect((await sentBy(student.client)).items[0]).toMatchObject({ id, status: 'rejected' });
+  });
+
+  it('pages through the student\u2019s records', async () => {
+    const student = await member('student');
+    for (const message of ['One', 'Two', 'Three']) {
+      expect((await call(student.client, 'tinir_write', 'send_inquiry', { listing_id: listingId, type: 'question', message })).code).toBe('OK');
+    }
+    const page1 = await sentBy(student.client, { page: 1, page_size: 2 });
+    const page2 = await sentBy(student.client, { page: 2, page_size: 2 });
+    expect(page1.items).toHaveLength(2);
+    expect(page2.items).toHaveLength(1);
+    expect(new Set([...page1.items, ...page2.items].map((i) => i.id)).size).toBe(3);
+  });
+});

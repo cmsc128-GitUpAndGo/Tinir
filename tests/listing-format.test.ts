@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatPeso, priceLabel, propertyTypeLabel } from '../src/services/listing-format';
+import { availabilityLabel, formatDate, formatPeso, mapUrl, priceLabel, propertyTypeLabel } from '../src/services/listing-format';
 
 describe('listing formatting (FR1, FR6)', () => {
   it('formats centavos as pesos', () => {
@@ -20,5 +20,26 @@ describe('listing formatting (FR1, FR6)', () => {
   it('labels property types', () => {
     expect(propertyTypeLabel('bedspace')).toBe('Bedspace');
     expect(propertyTypeLabel('apartment')).toBe('Apartment');
+  });
+});
+
+describe('listing details formatting (FR6)', () => {
+  it('describes availability with the open slot count', () => {
+    expect(availabilityLabel({ availability_status: 'full', available_slots: 3 })).toBe('Full');
+    expect(availabilityLabel({ availability_status: 'available', available_slots: 1 })).toBe('Available · 1 slot left');
+    expect(availabilityLabel({ availability_status: 'available', available_slots: 4 })).toBe('Available · 4 slots left');
+    expect(availabilityLabel({ availability_status: 'available', available_slots: null })).toBe('Available');
+    expect(availabilityLabel({ availability_status: 'available', available_slots: 0 })).toBe('Available');
+  });
+
+  it('formats dates and ignores missing or invalid timestamps', () => {
+    expect(formatDate('2026-11-18T04:00:00Z')).toMatch(/2026/);
+    expect(formatDate(null)).toBe('');
+    expect(formatDate('not a date')).toBe('');
+  });
+
+  it('links to a map only when the listing has coordinates', () => {
+    expect(mapUrl({ latitude: 10.643, longitude: 122.235 })).toBe('https://www.google.com/maps/search/?api=1&query=10.643,122.235');
+    expect(mapUrl({ latitude: null, longitude: 122.235 })).toBeNull();
   });
 });

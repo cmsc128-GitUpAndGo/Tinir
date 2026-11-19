@@ -38,6 +38,7 @@ export function TextField({ label, error, hint, optional, secret, ...input }: Fi
           placeholderTextColor={theme.textSecondary}
           style={[
             styles.input,
+            input.multiline && styles.multiline,
             { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: error ? ERROR_COLOR : theme.backgroundSelected },
           ]}
         />
@@ -126,6 +127,7 @@ const styles = StyleSheet.create({
   field: { gap: Spacing.one },
   inputRow: { justifyContent: 'center' },
   input: { minHeight: 48, borderWidth: 1, borderRadius: Spacing.two, paddingHorizontal: Spacing.three, fontSize: 16 },
+  multiline: { minHeight: 120, paddingTop: Spacing.three, paddingBottom: Spacing.three, textAlignVertical: 'top' },
   toggle: { position: 'absolute', right: Spacing.three, minHeight: 44, justifyContent: 'center' },
   choice: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, padding: Spacing.three, borderRadius: Spacing.three, borderWidth: 2, minHeight: 64 },
   choiceText: { flex: 1, gap: Spacing.half },

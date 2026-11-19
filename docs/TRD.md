@@ -30,6 +30,7 @@ flowchart LR
 | Component | Selection |
 |---|---|
 | Client | Existing Expo SDK 58, TypeScript, React Native, Expo Router |
+| Deliverables | Android app (EAS-built APK) and web app. iOS is not supported. |
 | Database / migrations | Supabase PostgreSQL 17; versioned SQL migrations and generated public RPC types |
 | Application transport | `supabase-js` calling guarded RPCs; no direct client access to base tables |
 | Identity | Supabase Auth email/password with required email confirmation and PKCE verification callback |
@@ -73,7 +74,17 @@ erDiagram
   LISTINGS ||--o{ SAVED_LISTINGS : references
   LISTINGS ||--o{ LISTING_REMINDERS : needs_confirmation
   SEMESTERS ||--o{ LISTING_REMINDERS : schedules
+  LISTINGS ||--o{ PHOTO_CLEANUP : queues_deleted_objects
+  AUTH_USERS ||--o{ REQUEST_LIMITS : throttles
+  CAMPUSES {
+    uuid id PK
+    text name
+    numeric latitude
+    numeric longitude
+  }
 ```
+
+`CAMPUSES` has no foreign key: FR14 computes an approximate straight-line distance between a listing's coordinates and a configured campus reference point at read time. `PHOTO_CLEANUP.listing_id` is a plain reference so queued object keys survive listing deletion.
 
 Supabase Auth exclusively owns credential hashes, email identity, verification tokens, and sessions. A signup trigger validates/copies the initial Student/Owner role into the private profile. Later edits to user metadata never change that role. There is no client-facing role-change operation, admin signup role, custom password table, or duplicate verification-token table.
 
@@ -85,7 +96,7 @@ Indexes cover listing discovery/owner queries and student/listing inquiry histor
 
 ### 4.1 Authentication
 
-Use Supabase Auth SDK operations for signup, password login, resend, PKCE code exchange, session retrieval, and logout. Verification redirects to `tinir://auth/callback` on native or `/auth/callback` on web. The callback is the only added feature route in this backend task; account forms and protected feature navigation remain their story issues.
+Use Supabase Auth SDK operations for signup, password login, resend, PKCE code exchange, session retrieval, and logout. Verification redirects to `tinir://auth/callback` on native or `/auth/callback` on web. When signup starts from a listing, the redirect carries the validated listing path as `next` so the callback can link back to it; the Auth redirect allow list therefore includes each callback with a `?**` query pattern. The callback is the only added feature route in this backend task; account forms and protected feature navigation remain their story issues.
 
 Email confirmation is enabled locally. Unconfirmed password login is rejected by Auth. Backend role actions also check the authoritative confirmation state, so possession of an old token cannot bypass verification. Owner contacts remain a login-only rule, separate from the verified-role requirement.
 

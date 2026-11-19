@@ -62,3 +62,13 @@ export function nextPage(state: FeedState<{ id: string }>, mode: FeedMode): numb
 export function retryMode(state: FeedState<{ id: string }>): FeedMode {
   return state.failed ?? (state.items.length ? 'refreshing' : 'loading');
 }
+
+/**
+ * Which request the current error belongs to, so the list can say what went wrong where it happened:
+ * the first load, a refresh that left older items on screen, or loading the next page. Null when not failed.
+ */
+export function feedFailure(state: FeedState<{ id: string }>): 'initial' | 'refresh' | 'more' | null {
+  if (state.status !== 'error') return null;
+  if (!state.items.length) return 'initial';
+  return retryMode(state) === 'loading-more' ? 'more' : 'refresh';
+}

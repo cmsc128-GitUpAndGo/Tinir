@@ -1,12 +1,13 @@
 import { DarkTheme, DefaultTheme, Slot, ThemeProvider, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { ActivityIndicator, Platform, StyleSheet, useColorScheme } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet } from 'react-native';
 
 import { SessionProvider } from '@/lib/supabase/session-provider';
 import { useViewer, ViewerProvider } from '@/lib/viewer-provider';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';
 import { ThemedView } from '@/components/themed-view';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 SplashScreen.preventAutoHideAsync();
 

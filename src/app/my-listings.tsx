@@ -26,7 +26,8 @@ function OwnListings() {
       renderItem={(item) => (
         <View style={styles.item}>
           <ThemedText type="smallBold" themeColor="textSecondary">{STATUS[item.status]}</ThemedText>
-          <ListingCard listing={item} />
+          {/* Only published listings have a public details page; drafts and archived ones get management in #17. */}
+          <ListingCard listing={item} link={item.status === 'published'} />
         </View>
       )}
       empty={{ title: 'No listings yet', body: 'Listings you create appear here, including drafts.' }}

@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
-import { StyleSheet, View } from 'react-native';
+import { Link } from 'expo-router';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -8,7 +9,29 @@ import { usePhotoUrl } from '@/hooks/use-photo-url';
 import type { Listing } from '@/services/contracts';
 import { priceLabel, propertyTypeLabel } from '@/services/listing-format';
 
-export function ListingCard({ listing }: { listing: Listing }) {
+/** A listing summary. With `link` (the default) it opens the listing's details (FR6). */
+export function ListingCard({ listing, link = true }: { listing: Listing; link?: boolean }) {
+  const label = cardLabel(listing);
+  const card = <CardBody listing={listing} label={link ? undefined : label} />;
+  if (!link) return card;
+  return (
+    <Link href={{ pathname: '/listing/[id]', params: { id: listing.id } }} asChild>
+      <Pressable accessibilityRole="link" accessibilityLabel={label} accessibilityHint="Opens the listing details"
+        style={({ pressed }) => [styles.link, pressed && styles.pressed]}>
+        {card}
+      </Pressable>
+    </Link>
+  );
+}
+
+function cardLabel(listing: Listing) {
+  const full = listing.availability_status === 'full';
+  const location = listing.area.trim() || 'Location shared on the listing';
+  return `${listing.title}. ${propertyTypeLabel(listing.property_type)}. ${location}. ${priceLabel(listing)}.${full ? ' Currently full.' : ''}`;
+}
+
+/** `label` makes the card one accessible element when it is not wrapped in a link. */
+function CardBody({ listing, label }: { listing: Listing; label?: string }) {
   const cover = [...listing.photos].sort((a, b) => a.sort_order - b.sort_order)[0];
   const { url, failed } = usePhotoUrl(cover?.id);
   const type = propertyTypeLabel(listing.property_type);
@@ -20,8 +43,8 @@ export function ListingCard({ listing }: { listing: Listing }) {
     <ThemedView
       type="backgroundElement"
       style={styles.card}
-      accessible
-      accessibilityLabel={`${listing.title}. ${type}. ${location}. ${price}.${full ? ' Currently full.' : ''}`}>
+      accessible={Boolean(label)}
+      accessibilityLabel={label}>
       <View style={styles.media}>
         {url ? (
           <Image
@@ -56,6 +79,8 @@ export function ListingCard({ listing }: { listing: Listing }) {
 }
 
 const styles = StyleSheet.create({
+  link: { flex: 1, borderRadius: Spacing.three },
+  pressed: { opacity: 0.8 },
   card: { borderRadius: Spacing.three, overflow: 'hidden', flex: 1 },
   media: { aspectRatio: 16 / 10, width: '100%' },
   placeholder: { alignItems: 'center', justifyContent: 'center' },

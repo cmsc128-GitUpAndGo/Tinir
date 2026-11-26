@@ -8,9 +8,10 @@ import {
 } from 'expo-router/ui';
 import type { Href } from 'expo-router';
 import type { ComponentRef, Ref } from 'react';
-import { Pressable, View, StyleSheet, useWindowDimensions } from 'react-native';
+import { Pressable, View, StyleSheet } from 'react-native';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { useWindowWidth } from '@/hooks/use-window-width';
 import { useViewer } from '@/lib/viewer-provider';
 import { visibleAreas, type Area } from '@/services/access';
 
@@ -32,7 +33,7 @@ export default function AppTabs() {
   // Each role sees its own tabs (FR5). Every route stays registered so a typed URL reaches the screen,
   // whose role gate then asks a guest to log in or tells a wrong role the page is not for them.
   const shown = new Set(visibleAreas(useViewer().viewer));
-  const compact = useWindowDimensions().width < COMPACT_TABS_BELOW;
+  const compact = useWindowWidth() < COMPACT_TABS_BELOW;
   return (
     <Tabs>
       <TabSlot style={{ height: '100%' }} />

@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode } from 'react';
-import { ActivityIndicator, FlatList, Platform, Pressable, RefreshControl, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, Platform, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Notice } from '@/components/form';
@@ -8,6 +8,7 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import type { usePagedFeed } from '@/hooks/use-listing-feed';
 import { useTheme } from '@/hooks/use-theme';
+import { useWindowWidth } from '@/hooks/use-window-width';
 import { feedFailure } from '@/services/listing-feed';
 
 const TWO_COLUMN_WIDTH = 720;
@@ -29,7 +30,7 @@ export function PagedList<T extends { id: string }>({ feed, header, renderItem, 
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const width = useWindowWidth();
   const columns = grid && width >= TWO_COLUMN_WIDTH ? 2 : 1;
   // Fixed widths keep a lone last card the same size as its row neighbours.
   const cardWidth = (Math.min(width, MaxContentWidth) - Spacing.three * (columns + 1)) / columns;

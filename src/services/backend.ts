@@ -3,7 +3,7 @@ import type { Json } from '@/lib/supabase/database.types';
 import type { Campus, Decision, Distance, Inquiry, Listing, ListingDetail, ListingFilters, ListingInput, ManagedListing, Page, PageRequest, Profile, Reminder } from './contracts';
 import { backendError, BackendError } from './errors';
 
-type ReadOperation = 'listings' | 'listing' | 'amenities' | 'campuses' | 'profile' | 'owner_listings' | 'saved_listings' | 'student_inquiries' | 'owner_inquiries' | 'reminders' | 'distance';
+type ReadOperation = 'listings' | 'listing' | 'amenities' | 'campuses' | 'profile' | 'owner_listings' | 'saved_listings' | 'saved_listing_status' | 'student_inquiries' | 'owner_inquiries' | 'reminders' | 'distance';
 type WriteOperation = 'create_listing' | 'update_listing' | 'publish_listing' | 'archive_listing' | 'reconfirm_listing' | 'send_inquiry' | 'update_inquiry' | 'save_listing';
 // One transport boundary; identity and disclosure are enforced by the database, never these casts.
 async function call<T>(method: 'tinir_read' | 'tinir_write', operation: ReadOperation | WriteOperation, args: object = {}): Promise<T> {
@@ -36,6 +36,7 @@ export const inquiries = {
 };
 export const savedListings = {
   list: (page: PageRequest = {}) => call<Page<Listing>>('tinir_read', 'saved_listings', page),
+  status: (id: string) => call<{ saved: boolean }>('tinir_read', 'saved_listing_status', { id }),
   set: (id: string, saved: boolean) => call<{ saved: boolean }>('tinir_write', 'save_listing', { id, saved }),
 };
 export const reminders = { list: (page: PageRequest = {}) => call<Page<Reminder>>('tinir_read', 'reminders', page) };

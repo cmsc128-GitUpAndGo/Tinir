@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ExternalLink } from '@/components/external-link';
 import { Button, Notice } from '@/components/form';
 import { InquiryActions } from '@/components/inquiry-actions';
+import { ListingBookmark } from '@/components/listing-bookmark';
 import { PhotoGallery } from '@/components/photo-gallery';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -98,6 +99,7 @@ function ListingBody({ listing }: { listing: ListingDetail }) {
         </View>
       </View>
 
+      <ListingBookmark listingId={listing.id} />
       <InquiryActions listingId={listing.id} />
 
       <Section title="Location">

@@ -36,7 +36,7 @@ async function member(role: 'student' | 'owner') {
   const c = client();
   const login = await c.auth.signInWithPassword({ email, password });
   if (login.error) throw login.error;
-  return { id: data.user.id, client: c };
+  return { id: data.user.id, client: c, email, password };
 }
 type Result = { code: string; data?: unknown };
 async function call(c: SupabaseClient, method: 'tinir_read' | 'tinir_write', operation: string, args: object = {}): Promise<Result> {
@@ -90,7 +90,7 @@ describe('guest (FR5)', () => {
     expect(detail.data).not.toHaveProperty('owner_contact');
   });
   it('is denied every private read', async () => {
-    for (const operation of ['profile', 'saved_listings', 'student_inquiries', 'owner_inquiries', 'owner_listings']) {
+    for (const operation of ['profile', 'saved_listings', 'saved_listing_status', 'student_inquiries', 'owner_inquiries', 'owner_listings']) {
       expect((await call(guest, 'tinir_read', operation)).code, operation).toBe('UNAUTHENTICATED');
     }
   });
@@ -139,6 +139,7 @@ describe('property owner (FR5)', () => {
   });
   it('is denied student reads and writes', async () => {
     expect((await call(owner.client, 'tinir_read', 'saved_listings')).code).toBe('FORBIDDEN');
+    expect((await call(owner.client, 'tinir_read', 'saved_listing_status', { id: listingId })).code).toBe('FORBIDDEN');
     expect((await call(owner.client, 'tinir_read', 'student_inquiries')).code).toBe('FORBIDDEN');
     expect((await call(owner.client, 'tinir_write', 'save_listing', { id: otherListingId, saved: true })).code).toBe('FORBIDDEN');
     expect((await call(owner.client, 'tinir_write', 'send_inquiry', { listing_id: otherListingId, type: 'question' })).code).toBe('FORBIDDEN');
@@ -157,6 +158,48 @@ describe('unverified account (FR5 / PRD §5)', () => {
     expect((await call(pending.client, 'tinir_read', 'listings')).code).toBe('OK');
     expect((await call(pending.client, 'tinir_read', 'profile')).data).toMatchObject({ email_verified: false });
     expect((await call(pending.client, 'tinir_read', 'saved_listings')).code).toBe('EMAIL_UNVERIFIED');
+    expect((await call(pending.client, 'tinir_read', 'saved_listing_status', { id: listingId })).code).toBe('EMAIL_UNVERIFIED');
     expect((await call(pending.client, 'tinir_write', 'save_listing', { id: listingId, saved: true })).code).toBe('EMAIL_UNVERIFIED');
+  });
+});
+
+describe('saved properties (FR13)', () => {
+  const status = (c: SupabaseClient, id: string, extra = {}) =>
+    call(c, 'tinir_read', 'saved_listing_status', { id, ...extra });
+  const setSaved = (c: SupabaseClient, id: string, saved: boolean) =>
+    call(c, 'tinir_write', 'save_listing', { id, saved });
+
+  it('scopes bookmark status to the authenticated student, even with a supplied student ID', async () => {
+    expect(await status(student.client, listingId)).toEqual({ code: 'OK', data: { saved: true } });
+    expect(await status(otherStudent.client, listingId, { student_id: student.id })).toEqual({ code: 'OK', data: { saved: false } });
+    expect((await status(student.client, draftId)).code).toBe('NOT_FOUND');
+    expect((await setSaved(student.client, draftId, true)).code).toBe('NOT_FOUND');
+  });
+
+  it('persists across sessions, handles repeat writes and omits archived listings and private fields', async () => {
+    sql(`UPDATE app_private.listings SET price_visible=false, price_amount=125000 WHERE id='${otherListingId}'`);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      expect(await setSaved(student.client, otherListingId, true)).toEqual({ code: 'OK', data: { saved: true } });
+    }
+    const newSession = client();
+    expect((await newSession.auth.signInWithPassword({ email: student.email, password: student.password })).error).toBeNull();
+    expect(await status(newSession, otherListingId)).toEqual({ code: 'OK', data: { saved: true } });
+
+    const first = await call(newSession, 'tinir_read', 'saved_listings', { page: 1, page_size: 1 });
+    expect(first.data).toMatchObject({ page: 1, page_size: 1, items: [{ id: otherListingId }] });
+    const item = (first.data as { items: object[] }).items[0];
+    expect(item).not.toHaveProperty('price_amount');
+    expect(item).not.toHaveProperty('owner_contact');
+    const second = await call(newSession, 'tinir_read', 'saved_listings', { page: 2, page_size: 1 });
+    expect(ids(second)).toEqual([listingId]);
+
+    expect((await call(otherOwner.client, 'tinir_write', 'archive_listing', { id: otherListingId })).code).toBe('OK');
+    expect((await status(newSession, otherListingId)).code).toBe('NOT_FOUND');
+    expect(ids(await call(newSession, 'tinir_read', 'saved_listings'))).toEqual([listingId]);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      expect(await setSaved(newSession, listingId, false)).toEqual({ code: 'OK', data: { saved: false } });
+    }
+    expect(await status(student.client, listingId)).toEqual({ code: 'OK', data: { saved: false } });
+    expect(ids(await call(student.client, 'tinir_read', 'saved_listings'))).toEqual([]);
   });
 });

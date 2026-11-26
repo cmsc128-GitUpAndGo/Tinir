@@ -124,7 +124,7 @@ The application client only uses the first two. The Edge Function derives `actor
 | Create/edit/publish/archive | write `create_listing`, `update_listing`, `publish_listing`, `archive_listing` |
 | Student inquiry submission/history | write `send_inquiry`; read `student_inquiries` |
 | Owner inbox/read/decision | read `owner_inquiries`; write `update_inquiry` |
-| Bookmark / Saved Properties | write `save_listing`; read `saved_listings` |
+| Bookmark / Saved Properties | write `save_listing`; read `saved_listing_status` for one published listing and `saved_listings` for the student's paginated bookmarks |
 | Campus distance | read `distance` |
 | Semester reminders / reconfirmation | read `reminders`; write `reconfirm_listing` |
 | Photo upload/read/delete | Edge Function `media` |

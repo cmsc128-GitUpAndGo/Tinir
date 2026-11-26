@@ -14,7 +14,7 @@ import type { Profile } from '@/services/contracts';
 const AREA_COPY: Record<Area, { title: string; roles: string; purpose: string }> = {
   browse: { title: 'Browse', roles: 'everyone', purpose: 'browse listings' },
   account: { title: 'Account', roles: 'everyone', purpose: 'manage your account' },
-  saved: { title: 'Saved listings', roles: 'students', purpose: 'save listings and compare them later' },
+  saved: { title: 'Saved Properties', roles: 'students', purpose: 'save listings and compare them later' },
   inquiries: { title: 'Inquiries', roles: 'students and property owners', purpose: 'send and answer inquiries' },
   'my-listings': { title: 'My listings', roles: 'property owners', purpose: 'post and manage your listings' },
 };

@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CampusDistance } from '@/components/campus-distance';
 import { ExternalLink } from '@/components/external-link';
 import { Button, Notice } from '@/components/form';
 import { InquiryActions } from '@/components/inquiry-actions';
@@ -102,6 +103,7 @@ function ListingBody({ listing }: { listing: ListingDetail }) {
 
       <Section title="Location">
         <ThemedText selectable>{listing.address}</ThemedText>
+        <CampusDistance listingId={listing.id} />
         {map ? (
           <ExternalLink href={map} accessibilityRole="link" accessibilityHint="Opens a map in your browser">
             <ThemedText type="linkPrimary">Open in maps</ThemedText>

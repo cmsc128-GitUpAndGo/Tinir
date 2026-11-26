@@ -96,7 +96,7 @@ Verification callback: native `tinir://auth/callback`, web `/auth/callback`. PKC
 
 These are operator-controlled reference tables, not client-writable APIs. After confirming the real reference point/dates with the team, insert them through a reviewed SQL migration. Do not copy synthetic integration-test coordinates into production.
 
-- `app_private.campuses`: UUID, name, latitude, longitude. Discovery services can list configured campuses; `listings.distance(listingId, campusId)` returns a labeled straight-line result or an unavailable reason.
+- `app_private.campuses`: UUID, name, latitude, longitude. Discovery services can list configured campuses; `listings.distance(listingId, campusId)` returns a labeled straight-line result or an unavailable reason. The listing screen shows verified students the distance to every configured campus, and says it is unavailable while none is configured (FR14).
 - `app_private.semesters`: ID, `starts_at`, `ends_at`, with end after start. The hourly `tinir-semester-reminders` job creates one dashboard reminder per published listing/active semester when the owner has not reconfirmed. No configured semester means no reminders.
 
 Owner reconfirmation updates `last_confirmed_at` and dismisses reminders; ordinary price edits do not count as explicit reconfirmation. There is no automatic expiry or reservation guarantee.

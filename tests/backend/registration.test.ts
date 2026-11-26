@@ -144,7 +144,7 @@ describe('registration and email verification (FR3)', () => {
   });
 
   it('brings the listing a guest came from back through the verification link (FR2)', async () => {
-    const listing = `/listing/${randomUUID()}`;
+    const listing = `/listing/${randomUUID()}` as const;
     for (const callback of ['http://localhost:8081/auth/callback', 'tinir://auth/callback']) {
       const client = browser();
       const email = address('return');

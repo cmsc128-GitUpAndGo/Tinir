@@ -1,3 +1,4 @@
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 
 import { isBackendConfigured } from '@/lib/supabase/client';
@@ -18,7 +19,10 @@ import {
  * Paged records from one backend read. `fetchPage` must be stable (a module-level function), and the
  * server decides what the caller may see; this hook only pages through it.
  */
-export function usePagedFeed<T extends { id: string }>(fetchPage: (page: PageRequest) => Promise<Page<T>>) {
+export function usePagedFeed<T extends { id: string }>(
+  fetchPage: (page: PageRequest) => Promise<Page<T>>,
+  { refreshOnFocus = false } = {},
+) {
   const [state, dispatch] = useReducer(feedReducer<T>, initialFeed as FeedState<T>);
   const latest = useRef(state);
   const inFlight = useRef<Mode | null>(null);
@@ -52,8 +56,12 @@ export function usePagedFeed<T extends { id: string }>(fetchPage: (page: PageReq
   }, [fetchPage]);
 
   useEffect(() => {
-    void load('loading');
-  }, [load]);
+    if (!refreshOnFocus) void load('loading');
+  }, [load, refreshOnFocus]);
+
+  useFocusEffect(useCallback(() => {
+    if (refreshOnFocus) void load(latest.current.page ? 'refreshing' : 'loading');
+  }, [load, refreshOnFocus]));
 
   return {
     ...state,

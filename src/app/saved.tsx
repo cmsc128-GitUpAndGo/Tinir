@@ -9,11 +9,11 @@ import { savedListings } from '@/services/backend';
 
 /** Student-only (FR5). The server returns only the caller's own saved listings. */
 export default function SavedScreen() {
-  return <RoleGate area="saved">{() => <SavedList />}</RoleGate>;
+  return <RoleGate area="saved">{(profile) => <SavedList key={profile.id} />}</RoleGate>;
 }
 
 function SavedList() {
-  const feed = usePagedFeed(savedListings.list);
+  const feed = usePagedFeed(savedListings.list, { refreshOnFocus: true });
   return (
     <PagedList
       feed={feed}
@@ -22,10 +22,10 @@ function SavedList() {
       renderItem={(item) => <ListingCard listing={item} />}
       empty={{
         title: 'No saved listings yet',
-        body: 'Save places while you browse to compare them here.',
+        body: 'Open a listing and choose Save listing to find it here later.',
         action: { label: 'Browse listings', onPress: () => router.navigate('/') },
       }}
-      header={<ThemedText type="subtitle" accessibilityRole="header">Saved listings</ThemedText>}
+      header={<ThemedText type="subtitle" accessibilityRole="header">Saved Properties</ThemedText>}
     />
   );
 }

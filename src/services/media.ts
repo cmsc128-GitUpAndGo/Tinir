@@ -14,7 +14,8 @@ async function invoke<T>(body: object | FormData, headers?: Record<string, strin
   return data as T;
 }
 export const media = {
-  upload: (listingId: string, file: Blob | { uri: string; name: string; type: string }) => {
+  // Async so the size check rejects like a server failure instead of throwing synchronously.
+  upload: async (listingId: string, file: Blob | { uri: string; name: string; type: string }) => {
     if ('size' in file && file.size > 5 * 1024 * 1024) throw new BackendError('INVALID_INPUT', 'Photos must be 5 MB or smaller.');
     const form = new FormData();
     form.append('listing_id', listingId);

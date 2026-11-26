@@ -1,5 +1,8 @@
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { Button } from '@/components/form';
 import { ListingCard } from '@/components/listing-card';
 import { PagedList } from '@/components/paged-list';
 import { RoleGate } from '@/components/role-gate';
@@ -18,6 +21,13 @@ export default function MyListingsScreen() {
 
 function OwnListings() {
   const feed = usePagedFeed(listings.own);
+  // Coming back from the new-listing form shows what was just saved. The first focus is the initial load.
+  const focused = useRef(false);
+  const { refresh } = feed;
+  useFocusEffect(useCallback(() => {
+    if (focused.current) refresh();
+    focused.current = true;
+  }, [refresh]));
   return (
     <PagedList
       feed={feed}
@@ -31,9 +41,20 @@ function OwnListings() {
         </View>
       )}
       empty={{ title: 'No listings yet', body: 'Listings you create appear here, including drafts.' }}
-      header={<ThemedText type="subtitle" accessibilityRole="header">My listings</ThemedText>}
+      header={(
+        <View style={styles.header}>
+          <ThemedText type="subtitle" accessibilityRole="header">My listings</ThemedText>
+          <View style={styles.action}>
+            <Button label="Create listing" onPress={() => router.push('/my-listings/new')} />
+          </View>
+        </View>
+      )}
     />
   );
 }
 
-const styles = StyleSheet.create({ item: { gap: Spacing.one } });
+const styles = StyleSheet.create({
+  item: { gap: Spacing.one },
+  header: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.three },
+  action: { minWidth: 160 },
+});

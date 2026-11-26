@@ -24,7 +24,7 @@ const PESO_AMOUNT = /^(\d+|\d{1,3}(,\d{3})+)(\.\d{1,2})?$/;
  * Pesos such as "2,500", "2500" or "2,500.50" to integer centavos; null when empty; NaN when not a
  * valid amount. Grouping is checked before the commas are removed, so "2,50" is not read as 250.
  */
-function centavos(value: string): number | null {
+export function centavos(value: string): number | null {
   const text = value.trim();
   if (!text) return null;
   if (!PESO_AMOUNT.test(text)) return Number.NaN;
